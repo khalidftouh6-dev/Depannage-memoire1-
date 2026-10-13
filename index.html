@@ -27,18 +27,18 @@ let L='fr',V='home',D=null,db;const t=k=>TR[L][k]||k,$=s=>document.getElementByI
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const open=(n='dm')=>new Promise(r=>{const q=indexedDB.open(n,2);q.onupgradeneeded=()=>{['claims','meters','events','res'].forEach(s=>{if(!q.result.objectStoreNames.contains(s))q.result.createObjectStore(s,{keyPath:'id'})})};q.onsuccess=()=>r(q.result)});
 const all=s=>new Promise(r=>{const q=db.transaction(s).objectStore(s).getAll();q.onsuccess=()=>r(q.result)});
-const put=(s,o)=>new Promise(r=>{const q=db.transaction(s,'readwrite').objectStore(s).put(o);q.onsuccess=()=>r()});
+const put=(s,o,raw)=>new Promise(r=>{if(window.TB&&TB[s]&&!raw)o.sync='pending';const q=db.transaction(s,'readwrite').objectStore(s).put(o);q.onsuccess=()=>{r();if(window.TB&&TB[s]&&!raw)setTimeout(()=>sync(),400)}});
 const uid=()=>crypto.randomUUID();
 // normalisation : retire seulement espaces/séparateurs usuels, n'altère ni n'ajoute aucun caractère
 const norm=s=>s.replace(/[\s.\-_\/]+/g,'');
 const ev=(rec,op,o,n,why)=>put('events',{id:uid(),at:new Date().toISOString(),op,rec,old:o,new:n,why});
-function bd(c){return `<span class="b ${c.prio}">${t(c.prio)}</span> <span class="b" style="background:var(--line)">${t(c.status)}</span>${c.demo?' <span class="b demo">DÉMO</span>':''}${c.cancelled?' <span class="b x" style="color:#fff">ANNULÉE</span>':''}`}
+function bd(c){return `<span class="b ${c.prio}">${t(c.prio)}</span> <span class="b" style="background:var(--line)">${t(c.status)}</span>${c.demo?' <span class="b demo">DÉMO</span>':''}${c.cancelled?' <span class="b x" style="color:#fff">ANNULÉE</span>':''}${syncB(c)}`}
 async function draw(){document.dir=L=='ar'?'rtl':'ltr';
  $('nv').innerHTML=[['home','home'],['claims','claims'],['meters','meters'],['res','res'],['rep','rep'],...(S&&S.profile&&S.profile.role=='admin'?[['emp','emp']]:[])].map(([v,k])=>`<button onclick="V='${v}';D=null;draw()">${t(k)}</button>`).join('');
  const C=await all('claims'),M=await all('meters');const m=$('m');
  if(V=='home'){m.innerHTML=`<div class="g">${['nouvelle','affectee','en_cours','traitee','transferee'].map(s=>`<div class="c" onclick="V='claims';F='${s}';draw()"><div class="n">${C.filter(c=>c.status==s&&!c.cancelled).length}</div>${t(s)}</div>`).join('')}</div>
- <button class="s" onclick="V='new';draw()">+ ${t('neu')}</button><button onclick="seed()">${t('demo')}</button>
- <p style="font-size:14px">Mode local (sans serveur). Données stockées sur cet appareil uniquement. Annulées exclues des chiffres.</p>`}
+ <button class="s" onclick="V='new';draw()">+ ${t('neu')}</button><button onclick="seed()">${t('demo')}</button><button onclick="sync(true)">Synchroniser maintenant</button><p id="sy" style="font-size:14px"></p>
+ <p style="font-size:14px">Une donnée est « Synchronisée » seulement après confirmation du serveur. Hors connexion : enregistrée localement, envoyée plus tard. Annulées exclues des chiffres.</p>`}
  if(V=='claims'){const l=C.filter(c=>!window.F||c.status==F).sort((a,b)=>b.created.localeCompare(a.created));window.F=null;
   m.innerHTML=`<button class="s" onclick="V='new';draw()">+ ${t('neu')}</button>`+(l.map(c=>`<div class="c" onclick="D='${c.id}';V='det';draw()"><b>${esc(c.contract)}</b> · ${esc(c.type)}<br>${bd(c)}<br><small>${new Date(c.created).toLocaleString()}${c.team?' · '+esc(c.team):''}</small></div>`).join('')||t('empty'))}
  if(V=='new')form();
@@ -47,7 +47,7 @@ async function draw(){document.dir=L=='ar'?'rtl':'ltr';
  if(V=='meters')meterView(M);if(V=='res')resView();if(V=='rep')repView();if(V=='emp')empView()}
 function acts(c){if(c.cancelled)return'';const s=c.status;let h='';
  if(s=='nouvelle')h+=`<select id="tm">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><button onclick="up('${c.id}','affectee',{team:$('tm').value})">${t('assign')}</button>`;
- if(s=='affectee'&&!c.received)h+=`<button onclick="up('${c.id}','affectee',{received:true})">${t('recv')}</button>`;
+ if(s=='affectee'&&!c.received)h+=`<button onclick="up('${c.id}','affectee',{received:true,receivedAt:new Date().toISOString()})">${t('recv')}</button>`;
  if(s=='affectee'&&c.received)h+=`<button onclick="up('${c.id}','en_cours')">${t('start')}</button>`;
  if(s=='en_cours'||s=='transferee')h+=`<button class="s" onclick="up('${c.id}','traitee')">${t('done')}</button>`;
  if(s=='en_cours'||s=='transferee')h+=`<button onclick="tr('${c.id}')">${t('transfer')}</button>`;
@@ -65,7 +65,7 @@ async function saveC(){const c={id:uid(),...P,status:'nouvelle',created:new Date
 function meterView(M){const m=$('m');
  m.innerHTML=`<input id="q" placeholder="${t('search')}" oninput="sm()"><div id="r"></div>`;window.MM=M;sm()}
 function sm(){const q=norm($('q').value||'').toLowerCase();$('r').innerHTML=window.MM.filter(x=>!q||norm(x.contract).toLowerCase().includes(q)||(x.meterNo||'').toLowerCase().includes(q)).map(x=>
- `<div class="c"><b>${esc(x.contract)}</b> ${x.demo?'<span class="b demo">DÉMO</span>':''}<br>${x.lat!=null?`${x.lat.toFixed(5)}, ${x.lon.toFixed(5)} — ±${x.acc??'?'} m (${x.mode})<br><a href="https://www.google.com/maps/dir/?api=1&destination=${x.lat},${x.lon}">Itinéraire</a>`:'—'}<br><small>${t('local')}</small>
+ `<div class="c"><b>${esc(x.contract)}</b> ${x.demo?'<span class="b demo">DÉMO</span>':''}<br>${x.lat!=null?`${x.lat.toFixed(5)}, ${x.lon.toFixed(5)} — ±${x.acc??'?'} m (${x.mode})<br><a href="https://www.google.com/maps/dir/?api=1&destination=${x.lat},${x.lon}">Itinéraire</a>`:'—'}<br><small>${syncL(x)}</small>
  <button onclick="gps('${x.id}')">${t('savegps')}</button></div>`).join('')+`<button class="s" onclick="addM()">+ Compteur</button>`}
 async function addM(){const c=norm(prompt('N° de contrat ?')||'');if(!c)return;await put('meters',{id:uid(),contract:c,meterNo:prompt('N° compteur (facultatif)')||'',lat:null,lon:null,hist:[]});draw()}
 function gps(id){if(!navigator.geolocation)return alert('GPS indisponible.');navigator.geolocation.getCurrentPosition(async p=>{const a=Math.round(p.coords.accuracy);
@@ -74,6 +74,28 @@ function gps(id){if(!navigator.geolocation)return alert('GPS indisponible.');nav
 async function seed(){const T=['fuite','manque d\'eau','compteur'],S=['nouvelle','affectee','en_cours','traitee','transferee'];
  for(let i=0;i<5;i++)await put('claims',{id:uid(),contract:'DEMO-000'+(i+1),type:T[i%3],prio:['urgente','normale','faible'][i%3],status:S[i],team:i?'Équipe '+i:'',received:i>1,notes:'Donnée de démonstration',created:new Date(Date.now()-i*36e5).toISOString(),demo:true});
  await put('meters',{id:uid(),contract:'DEMO-0001',meterNo:'DEMO-M1',lat:null,lon:null,demo:true});draw()}
+const TB={claims:'claims',meters:'meters',res:'reservations'};
+const tid=n=>((window.TT||[]).find(x=>x.name==n)||{}).id||null,tnm=i=>((window.TT||[]).find(x=>x.id==i)||{}).name||'';
+const ROW={claims:c=>({id:c.id,contract:c.contract,type:c.type,priority:c.prio,status:c.status,team_id:tid(c.team),notes:c.notes||null,received_at:c.receivedAt||(c.received?c.created:null),cancelled:!!c.cancelled,cancel_reason:c.cancelWhy||null,transfer_to:c.dest||null,transfer_reason:c.why||null,transferred_at:c.transferAt||null,demo:false,created_by:S.user.id,created_at:c.created}),
+ meters:m=>({id:m.id,contract:m.contract,meter_no:m.meterNo||null,lat:m.lat,lon:m.lon,accuracy_m:m.acc??null,source:m.lat==null?null:(m.mode=='GPS mesuré'?'gps':'manuel'),author:S.user.id}),
+ res:x=>({id:x.id,item:x.item,qty:x.qty,team_id:tid(x.team),day:x.day,reason:x.why||null,contract:x.contract||null,author:S.user.id})};
+const LOC={claims:r=>({id:r.id,contract:r.contract,type:r.type,prio:r.priority,status:r.status,team:tnm(r.team_id),notes:r.notes,received:!!r.received_at,receivedAt:r.received_at,cancelled:r.cancelled,cancelWhy:r.cancel_reason,dest:r.transfer_to,why:r.transfer_reason,transferAt:r.transferred_at,created:r.created_at}),
+ meters:r=>({id:r.id,contract:r.contract,meterNo:r.meter_no||'',lat:r.lat,lon:r.lon,acc:r.accuracy_m,mode:r.source=='gps'?'GPS mesuré':(r.source?'Choisi manuellement':undefined)}),
+ res:r=>({id:r.id,item:r.item,qty:r.qty,team:tnm(r.team_id),day:r.day,why:r.reason,contract:r.contract})};
+const syncL=x=>x.demo?'Démo (local)':x.sync=='synced'?'Synchronisé':x.sync=='failed'?'Échec de synchronisation':'En attente de synchronisation';
+const syncB=x=>` <span class="b" style="background:var(--line)">${syncL(x)}</span>`;
+let syncing=false;
+async function sync(manual){if(syncing||!S||!db)return;syncing=true;let ok=0,bad=0,msg='';
+ try{for(const s in TB){for(const x of await all(s)){if(x.sync=='synced'||x.demo)continue;
+   try{const r=await api('/rest/v1/'+TB[s]+'?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(ROW[s](x))});
+   if(r.ok){x.sync='synced';ok++}else{x.sync='failed';bad++;msg=(await r.json().catch(()=>({}))).message||r.status}
+   await put(s,x,true)}catch(e){bad++;msg='réseau indisponible'}}}
+  for(const s in TB){const r=await api('/rest/v1/'+TB[s]+'?select=*&limit=1000');if(!r.ok)continue;const loc=await all(s);const pend=new Set(loc.filter(x=>x.sync!='synced'&&!x.demo).map(x=>x.id));
+   for(const row of await r.json()){if(pend.has(row.id))continue;const old=loc.find(x=>x.id==row.id);await put(s,{...(old||{}),...LOC[s](row),sync:'synced'},true)}}
+ }catch(e){msg=e.message}
+ syncing=false;if(S&&['home','claims','meters','res','rep'].includes(V)&&!(document.activeElement&&document.activeElement.matches('input,textarea,select')))await draw();
+ const el=$('sy');if(el)el.textContent=(bad?'⚠ '+bad+' échec(s) : '+msg+'. ':'')+(ok?ok+' envoyé(s). ':'')+(manual&&!bad&&!msg?'Synchronisé ✓':'')}
+addEventListener('online',()=>sync());
 const fn=b=>api('/functions/v1/dynamic-task',{method:'POST',body:JSON.stringify(b)});
 async function empReset(id){const p=prompt('Nouveau mot de passe provisoire (8 caractères min.) :');if(!p)return;if(p.length<8)return alert('8 caractères minimum.');const r=await fn({action:'reset_password',id,password:p});const j=await r.json().catch(()=>({}));alert(r.ok?"Mot de passe réinitialisé. Communiquez-le à l'employé.":'Échec : '+(j.error||r.status))}
 async function empView(){const m=$('m');m.textContent='…';try{const [r,rt]=await Promise.all([api('/rest/v1/profiles?select=*&order=last_name'),api('/rest/v1/teams?select=id,name&order=name')]);const E=await r.json();if(!r.ok)throw new Error(E.message||r.status);window.EE=E;window.TT=rt.ok?await rt.json():[];
@@ -124,7 +146,7 @@ async function login(){const lk=+ST.get('lock')||0;if(Date.now()<lk)return $('lm
  if(!r.ok){const n=(+ST.get('fails')||0)+1;ST.set('fails',n);if(n>=5){ST.set('lock',Date.now()+3e5);ST.set('fails',0)}return $('lm').textContent='Identifiants incorrects.'}
  ST.set('fails',0);S=j;const pr=await api('/rest/v1/profiles?id=eq.'+j.user.id+'&select=role,first_name,last_name,active');const p=(await pr.json())[0];
  if(!p||!p.active){S=null;return $('lm').textContent='Compte sans profil actif. Contactez l\'administrateur.'}
- S.profile=p;db=await open('dm_'+j.user.id);$('who').textContent=(p.first_name||'')+' · '+p.role;V='home';draw();arm()}catch(e){$('lm').textContent='Connexion au serveur impossible : '+e.message}}
+ S.profile=p;db=await open('dm_'+j.user.id);try{const tr=await api('/rest/v1/teams?select=id,name');window.TT=tr.ok?await tr.json():[]}catch(e){window.TT=[]}$('who').textContent=(p.first_name||'')+' · '+p.role;V='home';draw();arm();sync()}catch(e){$('lm').textContent='Connexion au serveur impossible : '+e.message}}
 async function out(msg){const tk=S;S=null;clearTimeout(idle);loginUI(typeof msg=='string'?msg:'');try{if(tk)await fetch(SB+'/auth/v1/logout',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+tk.access_token}})}catch(e){}}
 function arm(){clearTimeout(idle);if(S)idle=setTimeout(out,3e5)}
 ['click','keydown','touchstart'].forEach(e=>document.addEventListener(e,arm));
