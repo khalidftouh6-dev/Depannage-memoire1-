@@ -15,11 +15,11 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--deep)}n
 @media print{header,nav,button{display:none}body{padding:0}}nav button{font-size:12px;padding:6px}</style></head><body><header><h1>💧 Dépannage Mémoire</h1><span id="who" style="font-size:13px"></span><span style="display:flex;gap:6px"><button style="width:auto;min-height:36px" onclick="L=L=='fr'?'ar':'fr';S?draw():loginUI()">FR/عربي</button><button class="x" style="width:auto;min-height:36px" onclick="out()">⏻</button></span></header>
 <main id="m"></main><nav id="nv"></nav>
 <script>
-const TR={fr:{home:"Accueil",res:"Réservations",rep:"Rapport",claims:"Réclamations",meters:"Compteurs",neu:"Nouvelle réclamation",contract:"N° de contrat",type:"Type",prio:"Priorité",team:"Équipe",notes:"Notes",recap:"Récapitulatif — contrat normalisé :",ok:"Confirmer et enregistrer",back:"Corriger",
+const TR={fr:{home:"Accueil",res:"Réservations",emp:"Employés",rep:"Rapport",claims:"Réclamations",meters:"Compteurs",neu:"Nouvelle réclamation",contract:"N° de contrat",type:"Type",prio:"Priorité",team:"Équipe",notes:"Notes",recap:"Récapitulatif — contrat normalisé :",ok:"Confirmer et enregistrer",back:"Corriger",
  nouvelle:"Nouvelle",affectee:"Affectée",en_cours:"En cours",traitee:"Traitée",transferee:"Transférée",urgente:"Urgente",normale:"Normale",faible:"Faible",search:"Contrat ou n° de compteur",savegps:"Enregistrer la position du compteur",
  demo:"Charger données de démonstration",empty:"Rien ici pour l'instant.",assign:"Affecter",recv:"Confirmer réception",start:"Démarrer",done:"Marquer traitée",transfer:"Transférer",cancel:"Annuler (motif requis)",hist:"réclamation(s) pour ce contrat",
  local:"Enregistré localement",types:["fuite","manque d'eau","compteur","autre","non précisé"]},
-ar:{home:"الرئيسية",res:"الحجوزات",rep:"التقرير",claims:"الشكاوى",meters:"العدادات",neu:"شكوى جديدة",contract:"رقم العقد",type:"النوع",prio:"الأولوية",team:"الفريق",notes:"ملاحظات",recap:"ملخص — رقم العقد بعد التوحيد:",ok:"تأكيد وحفظ",back:"تعديل",
+ar:{home:"الرئيسية",res:"الحجوزات",emp:"الموظفون",rep:"التقرير",claims:"الشكاوى",meters:"العدادات",neu:"شكوى جديدة",contract:"رقم العقد",type:"النوع",prio:"الأولوية",team:"الفريق",notes:"ملاحظات",recap:"ملخص — رقم العقد بعد التوحيد:",ok:"تأكيد وحفظ",back:"تعديل",
  nouvelle:"جديدة",affectee:"مُسندة",en_cours:"قيد التنفيذ",traitee:"معالجة",transferee:"محوّلة",urgente:"عاجلة",normale:"عادية",faible:"منخفضة",search:"العقد أو رقم العداد",savegps:"تسجيل موقع العداد",
  demo:"تحميل بيانات تجريبية",empty:"لا شيء بعد.",assign:"إسناد",recv:"تأكيد الاستلام",start:"بدء",done:"تمت المعالجة",transfer:"تحويل",cancel:"إلغاء (السبب مطلوب)",hist:"شكوى لهذا العقد",
  local:"محفوظ محليًا",types:["تسرب","انقطاع الماء","عداد","أخرى","غير محدد"]}};
@@ -34,7 +34,7 @@ const norm=s=>s.replace(/[\s.\-_\/]+/g,'');
 const ev=(rec,op,o,n,why)=>put('events',{id:uid(),at:new Date().toISOString(),op,rec,old:o,new:n,why});
 function bd(c){return `<span class="b ${c.prio}">${t(c.prio)}</span> <span class="b" style="background:var(--line)">${t(c.status)}</span>${c.demo?' <span class="b demo">DÉMO</span>':''}${c.cancelled?' <span class="b x" style="color:#fff">ANNULÉE</span>':''}`}
 async function draw(){document.dir=L=='ar'?'rtl':'ltr';
- $('nv').innerHTML=[['home','home'],['claims','claims'],['meters','meters'],['res','res'],['rep','rep']].map(([v,k])=>`<button onclick="V='${v}';D=null;draw()">${t(k)}</button>`).join('');
+ $('nv').innerHTML=[['home','home'],['claims','claims'],['meters','meters'],['res','res'],['rep','rep'],...(S&&S.profile&&S.profile.role=='admin'?[['emp','emp']]:[])].map(([v,k])=>`<button onclick="V='${v}';D=null;draw()">${t(k)}</button>`).join('');
  const C=await all('claims'),M=await all('meters');const m=$('m');
  if(V=='home'){m.innerHTML=`<div class="g">${['nouvelle','affectee','en_cours','traitee','transferee'].map(s=>`<div class="c" onclick="V='claims';F='${s}';draw()"><div class="n">${C.filter(c=>c.status==s&&!c.cancelled).length}</div>${t(s)}</div>`).join('')}</div>
  <button class="s" onclick="V='new';draw()">+ ${t('neu')}</button><button onclick="seed()">${t('demo')}</button>
@@ -44,7 +44,7 @@ async function draw(){document.dir=L=='ar'?'rtl':'ltr';
  if(V=='new')form();
  if(V=='det'){const c=C.find(x=>x.id==D),n=C.filter(x=>x.contract==c.contract).length-1;
   m.innerHTML=`<div class="c"><h2>${esc(c.contract)}</h2>${bd(c)}<p>${esc(c.type)} — ${esc(c.notes)}</p><p>${n} ${t('hist')} (+)</p>`+acts(c)+`</div>`}
- if(V=='meters')meterView(M);if(V=='res')resView();if(V=='rep')repView()}
+ if(V=='meters')meterView(M);if(V=='res')resView();if(V=='rep')repView();if(V=='emp')empView()}
 function acts(c){if(c.cancelled)return'';const s=c.status;let h='';
  if(s=='nouvelle')h+=`<select id="tm">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><button onclick="up('${c.id}','affectee',{team:$('tm').value})">${t('assign')}</button>`;
  if(s=='affectee'&&!c.received)h+=`<button onclick="up('${c.id}','affectee',{received:true})">${t('recv')}</button>`;
@@ -74,12 +74,33 @@ function gps(id){if(!navigator.geolocation)return alert('GPS indisponible.');nav
 async function seed(){const T=['fuite','manque d\'eau','compteur'],S=['nouvelle','affectee','en_cours','traitee','transferee'];
  for(let i=0;i<5;i++)await put('claims',{id:uid(),contract:'DEMO-000'+(i+1),type:T[i%3],prio:['urgente','normale','faible'][i%3],status:S[i],team:i?'Équipe '+i:'',received:i>1,notes:'Donnée de démonstration',created:new Date(Date.now()-i*36e5).toISOString(),demo:true});
  await put('meters',{id:uid(),contract:'DEMO-0001',meterNo:'DEMO-M1',lat:null,lon:null,demo:true});draw()}
+async function empView(){const m=$('m');m.textContent='…';try{const [r,rt]=await Promise.all([api('/rest/v1/profiles?select=*&order=last_name'),api('/rest/v1/teams?select=id,name&order=name')]);const E=await r.json();if(!r.ok)throw new Error(E.message||r.status);window.EE=E;window.TT=rt.ok?await rt.json():[];
+ m.innerHTML=`<button class="s" onclick="empForm()">+ Ajouter un employé</button>`+E.map(e=>`<div class="c" onclick="empForm('${e.id}')"><b>${esc(e.last_name)} ${esc(e.first_name)}</b> ${e.active?'':'<span class="b x" style="color:#fff">DÉSACTIVÉ</span>'}<br>Matricule : ${esc(e.matricule||'—')} · ${esc(e.role)}<br><small>${esc(e.job||'')} ${esc(e.phone||'')} ${esc(e.email||'')}</small></div>`).join('')}catch(e){m.textContent='Erreur : '+e.message}}
+function empForm(id){const e=id?window.EE.find(x=>x.id==id):{};const o=(a,v)=>a.map(([k,l])=>`<option value="${k}" ${k==v?'selected':''}>${esc(l)}</option>`).join('');
+ $('m').innerHTML=`<div class="c"><h2>${id?'Modifier':'Nouvel employé'}</h2>
+ <input id="ee" placeholder="E-mail professionnel (compte déjà créé)" value="${esc(e.email||'')}" ${id?'readonly':''}>
+ <input id="el" placeholder="Nom" value="${esc(e.last_name||'')}"><input id="ef" placeholder="Prénom" value="${esc(e.first_name||'')}">
+ <input id="em" placeholder="Matricule / N° d'identification" value="${esc(e.matricule||'')}"><input id="ep" placeholder="Téléphone professionnel (facultatif)" value="${esc(e.phone||'')}">
+ <input id="ej" placeholder="Fonction (facultatif)" value="${esc(e.job||'')}">
+ <select id="er">${o([['agent','Agent'],['chef',"Chef d'équipe"],['reception','Réception'],['admin','Administrateur']],e.role||'agent')}</select>
+ <select id="et"><option value="">— Équipe —</option>${o((window.TT||[]).map(t=>[t.id,t.name]),e.team_id)}</select>
+ ${id?`<select id="ea">${o([['true','Actif'],['false','Désactivé']],String(e.active))}</select>`:''}
+ <button class="s" onclick="empSave('${id||''}')">Enregistrer</button><button onclick="empView()">Retour</button><p id="ex" style="color:#c0392b"></p></div>`}
+async function empSave(id){const v=k=>$(k).value.trim();const b={last_name:v('el'),first_name:v('ef'),matricule:v('em'),phone:v('ep'),job:v('ej'),role:$('er').value,team_id:$('et').value||null};
+ if(!b.last_name||!b.first_name||!b.matricule)return $('ex').textContent='Nom, prénom et matricule obligatoires.';
+ try{let r;if(!id){if(!v('ee'))return $('ex').textContent='E-mail obligatoire.';
+  r=await api('/rest/v1/rpc/add_employee',{method:'POST',body:JSON.stringify({p_email:v('ee'),p_first:b.first_name,p_last:b.last_name,p_matricule:b.matricule,p_phone:b.phone,p_job:b.job,p_role:b.role,p_team:b.team_id})})}
+ else{b.active=$('ea').value=='true';b.updated_at=new Date().toISOString();const old=window.EE.find(x=>x.id==id);
+  r=await api('/rest/v1/profiles?id=eq.'+id,{method:'PATCH',body:JSON.stringify(b)});
+  if(r.ok)await api('/rest/v1/audit_log',{method:'POST',body:JSON.stringify({user_id:S.user.id,op:'modification employé',record:id,old_val:old,new_val:b})})}
+ if(!r.ok){const j=await r.json().catch(()=>({}));return $('ex').textContent='Refusé par le serveur : '+(j.message||r.status)}
+ empView()}catch(e){$('ex').textContent=e.message}}
 const dk=d=>new Date(d).toLocaleDateString('sv'),td=()=>dk(Date.now());
 async function resView(){const R=(await all('res')).sort((a,b)=>b.day.localeCompare(a.day));
- $('m').innerHTML=`<div class="c"><input id="ri" placeholder="Matériel demandé"><input id="rq" type="number" min="1" placeholder="Quantité"><select id="rt">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><input id="rd" type="date" value="${td()}"><input id="rr" placeholder="Motif"><button class="s" onclick="saveR()">Enregistrer la demande</button></div>`+
- (R.map(x=>`<div class="c"><b>${esc(x.item)}</b> × ${x.qty}<br>${esc(x.team)} · ${x.day}<br><small>${esc(x.why)}</small></div>`).join('')||t('empty'))}
+ $('m').innerHTML=`<div class="c"><input id="ri" placeholder="Matériel demandé"><input id="rc" placeholder="N° de contrat (lieu où la pièce est posée)"><input id="rq" type="number" min="1" placeholder="Quantité"><select id="rt">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><input id="rd" type="date" value="${td()}"><input id="rr" placeholder="Motif"><button class="s" onclick="saveR()">Enregistrer la demande</button></div>`+
+ (R.map(x=>`<div class="c"><b>${esc(x.item)}</b> × ${x.qty}<br>${x.contract?'Contrat <b>'+esc(x.contract)+'</b> · ':''}${esc(x.team)} · ${x.day}<br><small>${esc(x.why)}</small></div>`).join('')||t('empty'))}
 async function saveR(){const q=+$('rq').value,i=$('ri').value.trim();if(!i||!(q>0))return alert('Matériel et quantité (≥ 1) obligatoires.');
- await put('res',{id:uid(),item:i,qty:q,team:$('rt').value,day:$('rd').value||td(),why:$('rr').value,created:new Date().toISOString()});resView()}
+ await put('res',{id:uid(),item:i,contract:norm($('rc').value),qty:q,team:$('rt').value,day:$('rd').value||td(),why:$('rr').value,created:new Date().toISOString()});resView()}
 const cnt=(a,f)=>{const o={};a.forEach(x=>{const k=f(x)||'—';o[k]=(o[k]||0)+1});return Object.entries(o).map(([k,v])=>`<div>${esc(k)} : <b>${v}</b></div>`).join('')||'—'};
 async function repView(){const C=await all('claims'),R=await all('res'),T=td(),A=C.filter(c=>!c.cancelled),X=C.filter(c=>c.cancelled),O=A.filter(c=>c.status!='traitee');
  const nw=A.filter(c=>dk(c.created)==T);
@@ -89,7 +110,7 @@ async function repView(){const C=await all('claims'),R=await all('res'),T=td(),A
  <div class="c"><b>Par équipe</b>${cnt(A,c=>c.team)}</div><div class="c"><b>Par type</b>${cnt(A,c=>c.type)}</div>
  <div class="c"><b>Transférées</b> : ${A.filter(c=>c.status=='transferee').length}</div>
  <div class="c"><b>Annulées (séparées, non comptées)</b> : ${X.length}</div>
- <div class="c"><b>Réservations du jour</b>${cnt(R.filter(x=>x.day==T),x=>x.item+' ×'+x.qty)}</div>
+ <div class="c"><b>Réservations du jour</b>${cnt(R.filter(x=>x.day==T),x=>x.item+' ×'+x.qty+(x.contract?' @'+x.contract:''))}</div>
  <button onclick="window.print()">Exporter en PDF (Imprimer → Enregistrer en PDF)</button>`}
 const SB='https://uzvebghzshrygtrdwxsv.supabase.co',KEY='sb_publishable_Bf0QdSJ7CZ1Q1P-LLMJn9A_0dodgZkj';
 let S=null,idle;const ST={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
