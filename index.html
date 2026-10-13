@@ -25,7 +25,7 @@ ar:{home:"الرئيسية",res:"الحجوزات",emp:"الموظفون",rep:"�
  local:"محفوظ محليًا",types:["تسرب","انقطاع الماء","عداد","أخرى","غير محدد"]}};
 let L='fr',V='home',D=null,db;const t=k=>TR[L][k]||k,$=s=>document.getElementById(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const open=()=>new Promise(r=>{const q=indexedDB.open('dm',2);q.onupgradeneeded=()=>{['claims','meters','events','res'].forEach(s=>{if(!q.result.objectStoreNames.contains(s))q.result.createObjectStore(s,{keyPath:'id'})})};q.onsuccess=()=>r(q.result)});
+const open=(n='dm')=>new Promise(r=>{const q=indexedDB.open(n,2);q.onupgradeneeded=()=>{['claims','meters','events','res'].forEach(s=>{if(!q.result.objectStoreNames.contains(s))q.result.createObjectStore(s,{keyPath:'id'})})};q.onsuccess=()=>r(q.result)});
 const all=s=>new Promise(r=>{const q=db.transaction(s).objectStore(s).getAll();q.onsuccess=()=>r(q.result)});
 const put=(s,o)=>new Promise(r=>{const q=db.transaction(s,'readwrite').objectStore(s).put(o);q.onsuccess=()=>r()});
 const uid=()=>crypto.randomUUID();
@@ -43,7 +43,7 @@ async function draw(){document.dir=L=='ar'?'rtl':'ltr';
   m.innerHTML=`<button class="s" onclick="V='new';draw()">+ ${t('neu')}</button>`+(l.map(c=>`<div class="c" onclick="D='${c.id}';V='det';draw()"><b>${esc(c.contract)}</b> · ${esc(c.type)}<br>${bd(c)}<br><small>${new Date(c.created).toLocaleString()}${c.team?' · '+esc(c.team):''}</small></div>`).join('')||t('empty'))}
  if(V=='new')form();
  if(V=='det'){const c=C.find(x=>x.id==D),n=C.filter(x=>x.contract==c.contract).length-1;
-  m.innerHTML=`<div class="c"><h2>${esc(c.contract)}</h2>${bd(c)}<p>${esc(c.type)} — ${esc(c.notes)}</p><p>${n} ${t('hist')} (+)</p>`+acts(c)+`</div>`}
+  m.innerHTML=`<div class="c"><h2>${esc(c.contract)}</h2>${bd(c)}<p>${esc(c.type)} — ${esc(c.notes)}</p><p>${n} ${t('hist')}</p>`+acts(c)+`</div>`}
  if(V=='meters')meterView(M);if(V=='res')resView();if(V=='rep')repView();if(V=='emp')empView()}
 function acts(c){if(c.cancelled)return'';const s=c.status;let h='';
  if(s=='nouvelle')h+=`<select id="tm">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><button onclick="up('${c.id}','affectee',{team:$('tm').value})">${t('assign')}</button>`;
@@ -64,7 +64,7 @@ function rec(){const c=norm($('fc').value);if(!c)return alert('Le numéro de con
 async function saveC(){const c={id:uid(),...P,status:'nouvelle',created:new Date().toISOString(),sync:'local'};await put('claims',c);await ev(c.id,'création',null,c.contract);P=null;V='claims';draw()}
 function meterView(M){const m=$('m');
  m.innerHTML=`<input id="q" placeholder="${t('search')}" oninput="sm()"><div id="r"></div>`;window.MM=M;sm()}
-function sm(){const q=norm($('q').value||'').toLowerCase();$('r').innerHTML=window.MM.filter(x=>!q||x.contract.toLowerCase().includes(q)||(x.meterNo||'').toLowerCase().includes(q)).map(x=>
+function sm(){const q=norm($('q').value||'').toLowerCase();$('r').innerHTML=window.MM.filter(x=>!q||norm(x.contract).toLowerCase().includes(q)||(x.meterNo||'').toLowerCase().includes(q)).map(x=>
  `<div class="c"><b>${esc(x.contract)}</b> ${x.demo?'<span class="b demo">DÉMO</span>':''}<br>${x.lat!=null?`${x.lat.toFixed(5)}, ${x.lon.toFixed(5)} — ±${x.acc??'?'} m (${x.mode})<br><a href="https://www.google.com/maps/dir/?api=1&destination=${x.lat},${x.lon}">Itinéraire</a>`:'—'}<br><small>${t('local')}</small>
  <button onclick="gps('${x.id}')">${t('savegps')}</button></div>`).join('')+`<button class="s" onclick="addM()">+ Compteur</button>`}
 async function addM(){const c=norm(prompt('N° de contrat ?')||'');if(!c)return;await put('meters',{id:uid(),contract:c,meterNo:prompt('N° compteur (facultatif)')||'',lat:null,lon:null,hist:[]});draw()}
@@ -88,6 +88,7 @@ function empForm(id){const e=id?window.EE.find(x=>x.id==id):{};const o=(a,v)=>a.
  <button class="s" onclick="empSave('${id||''}')">Enregistrer</button><button onclick="empView()">Retour</button><p id="ex" style="color:#c0392b"></p></div>`}
 async function empSave(id){const v=k=>$(k).value.trim();const b={last_name:v('el'),first_name:v('ef'),matricule:v('em'),phone:v('ep'),job:v('ej'),role:$('er').value,team_id:$('et').value||null};
  if(!b.last_name||!b.first_name||!b.matricule)return $('ex').textContent='Nom, prénom et matricule obligatoires.';
+ if(id&&id==S.user.id&&(b.role!='admin'||$('ea').value!='true'))return $('ex').textContent='Vous ne pouvez pas retirer votre propre accès administrateur.';
  try{let r;if(!id){if(!v('ee'))return $('ex').textContent='E-mail obligatoire.';
   r=await api('/rest/v1/rpc/add_employee',{method:'POST',body:JSON.stringify({p_email:v('ee'),p_first:b.first_name,p_last:b.last_name,p_matricule:b.matricule,p_phone:b.phone,p_job:b.job,p_role:b.role,p_team:b.team_id})})}
  else{b.active=$('ea').value=='true';b.updated_at=new Date().toISOString();const old=window.EE.find(x=>x.id==id);
@@ -114,16 +115,16 @@ async function repView(){const C=await all('claims'),R=await all('res'),T=td(),A
  <button onclick="window.print()">Exporter en PDF (Imprimer → Enregistrer en PDF)</button>`}
 const SB='https://uzvebghzshrygtrdwxsv.supabase.co',KEY='sb_publishable_Bf0QdSJ7CZ1Q1P-LLMJn9A_0dodgZkj';
 let S=null,idle;const ST={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
-const api=(p,o={})=>fetch(SB+p,{...o,headers:{apikey:KEY,'Content-Type':'application/json',...(S?{Authorization:'Bearer '+S.access_token}:{}),...(o.headers||{})}});
+const api=async(p,o={})=>{const x=await fetch(SB+p,{...o,headers:{apikey:KEY,'Content-Type':'application/json',...(S?{Authorization:'Bearer '+S.access_token}:{}),...(o.headers||{})}});if(x.status==401&&S&&!p.includes('/auth/'))out('Session expirée, reconnectez-vous.');return x};
 function loginUI(msg=''){document.dir=L=='ar'?'rtl':'ltr';$('nv').innerHTML='';$('who').textContent='';$('m').innerHTML=`<div class="c"><h2>Connexion</h2><input id="le" type="email" autocomplete="username" placeholder="E-mail professionnel"><input id="lp" type="password" autocomplete="current-password" placeholder="Mot de passe"><label><input type="checkbox" style="width:auto;min-height:0" onchange="$('lp').type=this.checked?'text':'password'"> Afficher le mot de passe</label><button class="s" onclick="login()">Se connecter</button><p id="lm" style="color:#c0392b">${msg}</p></div>`}
 async function login(){const lk=+ST.get('lock')||0;if(Date.now()<lk)return $('lm').textContent='Trop d\'échecs. Réessayez dans '+Math.ceil((lk-Date.now())/6e4)+' min.';
  try{const r=await api('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email:$('le').value.trim(),password:$('lp').value})});const j=await r.json();
  if(!r.ok){const n=(+ST.get('fails')||0)+1;ST.set('fails',n);if(n>=5){ST.set('lock',Date.now()+3e5);ST.set('fails',0)}return $('lm').textContent='Identifiants incorrects.'}
  ST.set('fails',0);S=j;const pr=await api('/rest/v1/profiles?id=eq.'+j.user.id+'&select=role,first_name,last_name,active');const p=(await pr.json())[0];
  if(!p||!p.active){S=null;return $('lm').textContent='Compte sans profil actif. Contactez l\'administrateur.'}
- S.profile=p;$('who').textContent=(p.first_name||'')+' · '+p.role;V='home';draw();arm()}catch(e){$('lm').textContent='Connexion au serveur impossible : '+e.message}}
-async function out(){try{if(S)await api('/auth/v1/logout',{method:'POST'})}catch(e){}S=null;clearTimeout(idle);loginUI()}
+ S.profile=p;db=await open('dm_'+j.user.id);$('who').textContent=(p.first_name||'')+' · '+p.role;V='home';draw();arm()}catch(e){$('lm').textContent='Connexion au serveur impossible : '+e.message}}
+async function out(msg){const tk=S;S=null;clearTimeout(idle);loginUI(typeof msg=='string'?msg:'');try{if(tk)await fetch(SB+'/auth/v1/logout',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+tk.access_token}})}catch(e){}}
 function arm(){clearTimeout(idle);if(S)idle=setTimeout(out,3e5)}
 ['click','keydown','touchstart'].forEach(e=>document.addEventListener(e,arm));
-open().then(d=>{db=d;loginUI()});if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+loginUI();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script></body></html>
