@@ -12,7 +12,7 @@ button{background:var(--deep);color:#fff;border:0;font-weight:600}button.s{backg
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--deep)}nav button{border-radius:0;margin:0;background:none;font-size:14px}
 .b{display:inline-block;padding:2px 8px;border-radius:6px;font-size:14px;font-weight:600}
 .urgente{background:#c0392b;color:#fff}.normale{background:#f2b632}.faible{background:#2e8b57;color:#fff}.demo{background:#ddd;color:#333}
-@media print{header,nav,button{display:none}body{padding:0}}nav button{font-size:12px;padding:6px}</style></head><body><header><h1>💧 Dépannage Mémoire</h1><span id="who" style="font-size:13px"></span><span style="display:flex;gap:6px"><button style="width:auto;min-height:36px" onclick="L=L=='fr'?'ar':'fr';S?draw():loginUI()">FR/عربي</button><button class="x" style="width:auto;min-height:36px" onclick="out()">⏻</button></span></header>
+@media print{header,nav,button{display:none}body{padding:0}}nav button{font-size:12px;padding:6px}</style></head><body><header><h1>💧 Dépannage Mémoire</h1><span id="who" style="font-size:13px"></span><span style="display:flex;gap:6px"><button style="width:auto;min-height:36px" onclick="L=L=='fr'?'ar':'fr';S?draw():loginUI()">FR/عربي</button><button class="x" style="width:auto;min-height:36px" onclick="out()">Sortir</button></span></header>
 <main id="m"></main><nav id="nv"></nav>
 <script>
 const TR={fr:{home:"Accueil",res:"Réservations",emp:"Employés",rep:"Rapport",claims:"Réclamations",meters:"Compteurs",neu:"Nouvelle réclamation",contract:"N° de contrat",type:"Type",prio:"Priorité",team:"Équipe",notes:"Notes",recap:"Récapitulatif — contrat normalisé :",ok:"Confirmer et enregistrer",back:"Corriger",
@@ -74,27 +74,29 @@ function gps(id){if(!navigator.geolocation)return alert('GPS indisponible.');nav
 async function seed(){const T=['fuite','manque d\'eau','compteur'],S=['nouvelle','affectee','en_cours','traitee','transferee'];
  for(let i=0;i<5;i++)await put('claims',{id:uid(),contract:'DEMO-000'+(i+1),type:T[i%3],prio:['urgente','normale','faible'][i%3],status:S[i],team:i?'Équipe '+i:'',received:i>1,notes:'Donnée de démonstration',created:new Date(Date.now()-i*36e5).toISOString(),demo:true});
  await put('meters',{id:uid(),contract:'DEMO-0001',meterNo:'DEMO-M1',lat:null,lon:null,demo:true});draw()}
+const fn=b=>api('/functions/v1/dynamic-task',{method:'POST',body:JSON.stringify(b)});
+async function empReset(id){const p=prompt('Nouveau mot de passe provisoire (8 caractères min.) :');if(!p)return;if(p.length<8)return alert('8 caractères minimum.');const r=await fn({action:'reset_password',id,password:p});const j=await r.json().catch(()=>({}));alert(r.ok?"Mot de passe réinitialisé. Communiquez-le à l'employé.":'Échec : '+(j.error||r.status))}
 async function empView(){const m=$('m');m.textContent='…';try{const [r,rt]=await Promise.all([api('/rest/v1/profiles?select=*&order=last_name'),api('/rest/v1/teams?select=id,name&order=name')]);const E=await r.json();if(!r.ok)throw new Error(E.message||r.status);window.EE=E;window.TT=rt.ok?await rt.json():[];
  m.innerHTML=`<button class="s" onclick="empForm()">+ Ajouter un employé</button>`+E.map(e=>`<div class="c" onclick="empForm('${e.id}')"><b>${esc(e.last_name)} ${esc(e.first_name)}</b> ${e.active?'':'<span class="b x" style="color:#fff">DÉSACTIVÉ</span>'}<br>Matricule : ${esc(e.matricule||'—')} · ${esc(e.role)}<br><small>${esc(e.job||'')} ${esc(e.phone||'')} ${esc(e.email||'')}</small></div>`).join('')}catch(e){m.textContent='Erreur : '+e.message}}
 function empForm(id){const e=id?window.EE.find(x=>x.id==id):{};const o=(a,v)=>a.map(([k,l])=>`<option value="${k}" ${k==v?'selected':''}>${esc(l)}</option>`).join('');
  $('m').innerHTML=`<div class="c"><h2>${id?'Modifier':'Nouvel employé'}</h2>
- <input id="ee" placeholder="E-mail professionnel (compte déjà créé)" value="${esc(e.email||'')}" ${id?'readonly':''}>
+ <input id="ee" type="email" placeholder="E-mail professionnel" value="${esc(e.email||'')}" ${id?'readonly':''}>${id?'':'<input id="ep2" type="text" placeholder="Mot de passe provisoire (8 caractères min.)">'}
  <input id="el" placeholder="Nom" value="${esc(e.last_name||'')}"><input id="ef" placeholder="Prénom" value="${esc(e.first_name||'')}">
  <input id="em" placeholder="Matricule / N° d'identification" value="${esc(e.matricule||'')}"><input id="ep" placeholder="Téléphone professionnel (facultatif)" value="${esc(e.phone||'')}">
  <input id="ej" placeholder="Fonction (facultatif)" value="${esc(e.job||'')}">
  <select id="er">${o([['agent','Agent'],['chef',"Chef d'équipe"],['reception','Réception'],['admin','Administrateur']],e.role||'agent')}</select>
  <select id="et"><option value="">— Équipe —</option>${o((window.TT||[]).map(t=>[t.id,t.name]),e.team_id)}</select>
  ${id?`<select id="ea">${o([['true','Actif'],['false','Désactivé']],String(e.active))}</select>`:''}
- <button class="s" onclick="empSave('${id||''}')">Enregistrer</button><button onclick="empView()">Retour</button><p id="ex" style="color:#c0392b"></p></div>`}
+ <button class="s" onclick="empSave('${id||''}')">Enregistrer</button>${id?`<button onclick="empReset('${id}')">Réinitialiser le mot de passe</button>`:''}<button onclick="empView()">Retour</button><p id="ex" style="color:#c0392b"></p></div>`}
 async function empSave(id){const v=k=>$(k).value.trim();const b={last_name:v('el'),first_name:v('ef'),matricule:v('em'),phone:v('ep'),job:v('ej'),role:$('er').value,team_id:$('et').value||null};
  if(!b.last_name||!b.first_name||!b.matricule)return $('ex').textContent='Nom, prénom et matricule obligatoires.';
  if(id&&id==S.user.id&&(b.role!='admin'||$('ea').value!='true'))return $('ex').textContent='Vous ne pouvez pas retirer votre propre accès administrateur.';
  try{let r;if(!id){if(!v('ee'))return $('ex').textContent='E-mail obligatoire.';
-  r=await api('/rest/v1/rpc/add_employee',{method:'POST',body:JSON.stringify({p_email:v('ee'),p_first:b.first_name,p_last:b.last_name,p_matricule:b.matricule,p_phone:b.phone,p_job:b.job,p_role:b.role,p_team:b.team_id})})}
+  if($('ep2').value.length<8)return $('ex').textContent='Mot de passe provisoire : 8 caractères minimum.';r=await fn({action:'create',email:v('ee'),password:$('ep2').value,...b})}
  else{b.active=$('ea').value=='true';b.updated_at=new Date().toISOString();const old=window.EE.find(x=>x.id==id);
   r=await api('/rest/v1/profiles?id=eq.'+id,{method:'PATCH',body:JSON.stringify(b)});
-  if(r.ok)await api('/rest/v1/audit_log',{method:'POST',body:JSON.stringify({user_id:S.user.id,op:'modification employé',record:id,old_val:old,new_val:b})})}
- if(!r.ok){const j=await r.json().catch(()=>({}));return $('ex').textContent='Refusé par le serveur : '+(j.message||r.status)}
+  if(r.ok)await api('/rest/v1/audit_log',{method:'POST',body:JSON.stringify({user_id:S.user.id,op:'modification employé',record:id,old_val:old,new_val:b})});if(r.ok&&old.active!==b.active){const r2=await fn({action:'set_active',id,active:b.active});if(!r2.ok){const j2=await r2.json().catch(()=>({}));return $('ex').textContent='Profil modifié, mais blocage/déblocage du compte échoué : '+(j2.error||r2.status)}}}
+ if(!r.ok){const j=await r.json().catch(()=>({}));return $('ex').textContent='Refusé par le serveur : '+(j.error||j.message||r.status)}
  empView()}catch(e){$('ex').textContent=e.message}}
 const dk=d=>new Date(d).toLocaleDateString('sv'),td=()=>dk(Date.now());
 async function resView(){const R=(await all('res')).sort((a,b)=>b.day.localeCompare(a.day));
