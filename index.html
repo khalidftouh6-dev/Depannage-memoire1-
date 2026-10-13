@@ -30,7 +30,7 @@ const all=s=>new Promise(r=>{const q=db.transaction(s).objectStore(s).getAll();q
 const put=(s,o,raw)=>new Promise(r=>{if(window.TB&&TB[s]&&!raw)o.sync='pending';const q=db.transaction(s,'readwrite').objectStore(s).put(o);q.onsuccess=()=>{r();if(window.TB&&TB[s]&&!raw)setTimeout(()=>sync(),400)}});
 const uid=()=>crypto.randomUUID();
 // normalisation : retire seulement espaces/séparateurs usuels, n'altère ni n'ajoute aucun caractère
-const norm=s=>s.replace(/[\s.\-_\/]+/g,'');
+const norm=s=>s.replace(/[\s.\-_\/,;]+/g,'.').replace(/^\.+|\.+$/g,'');const key=s=>String(s||'').replace(/[\s.\-_\/,;]+/g,'');
 const ev=(rec,op,o,n,why)=>put('events',{id:uid(),at:new Date().toISOString(),op,rec,old:o,new:n,why});
 function bd(c){return `<span class="b ${c.prio}">${t(c.prio)}</span> <span class="b" style="background:var(--line)">${t(c.status)}</span>${c.demo?' <span class="b demo">DÉMO</span>':''}${c.cancelled?' <span class="b x" style="color:#fff">ANNULÉE</span>':''}${syncB(c)}`}
 async function draw(){document.dir=L=='ar'?'rtl':'ltr';
@@ -42,29 +42,29 @@ async function draw(){document.dir=L=='ar'?'rtl':'ltr';
  if(V=='claims'){const l=C.filter(c=>!window.F||c.status==F).sort((a,b)=>b.created.localeCompare(a.created));window.F=null;
   m.innerHTML=`<button class="s" onclick="V='new';draw()">+ ${t('neu')}</button>`+(l.map(c=>`<div class="c" onclick="D='${c.id}';V='det';draw()"><b>${esc(c.contract)}</b> · ${esc(c.type)}<br>${bd(c)}<br><small>${new Date(c.created).toLocaleString()}${c.team?' · '+esc(c.team):''}</small></div>`).join('')||t('empty'))}
  if(V=='new')form();
- if(V=='det'){const c=C.find(x=>x.id==D),n=C.filter(x=>x.contract==c.contract).length-1;
-  m.innerHTML=`<div class="c"><h2>${esc(c.contract)}</h2>${bd(c)}<p>${esc(c.type)} — ${esc(c.notes)}</p><p>${n} ${t('hist')}</p>`+acts(c)+`</div>`}
+ if(V=='det'){const c=C.find(x=>x.id==D),n=C.filter(x=>key(x.contract)==key(c.contract)).length-1;
+  m.innerHTML=`<div class="c"><h2>${esc(c.contract)}</h2>${bd(c)}<p>${esc(c.type)}</p>${det(c)}<p>${n} ${t('hist')}</p>`+acts(c)+`</div>`}
  if(V=='meters')meterView(M);if(V=='res')resView();if(V=='rep')repView();if(V=='emp')empView()}
 function acts(c){if(c.cancelled)return'';const s=c.status;let h='';
  if(s=='nouvelle')h+=`<select id="tm">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><button onclick="up('${c.id}','affectee',{team:$('tm').value})">${t('assign')}</button>`;
  if(s=='affectee'&&!c.received)h+=`<button onclick="up('${c.id}','affectee',{received:true,receivedAt:new Date().toISOString()})">${t('recv')}</button>`;
  if(s=='affectee'&&c.received)h+=`<button onclick="up('${c.id}','en_cours')">${t('start')}</button>`;
- if(s=='en_cours'||s=='transferee')h+=`<button class="s" onclick="up('${c.id}','traitee')">${t('done')}</button>`;
+ if(s=='en_cours'||s=='transferee')h+=`<button class="s" onclick="done('${c.id}')">${t('done')}</button>`;
  if(s=='en_cours'||s=='transferee')h+=`<button onclick="tr('${c.id}')">${t('transfer')}</button>`;
  return h+`<button class="x" onclick="canc('${c.id}')">${t('cancel')}</button>`}
-async function up(id,st,x={}){const c=(await all('claims')).find(y=>y.id==id),o=c.status;Object.assign(c,x,{status:st});await put('claims',c);await ev(id,'statut',o,st);draw()}
+async function up(id,st,x={}){const c=(await all('claims')).find(y=>y.id==id),o=c.status;Object.assign(c,x,{status:st});const ts=new Date().toISOString();if(st=='affectee'&&x.team)c.assignedAt=ts;if(st=='en_cours')c.startedAt=ts;if(st=='traitee')c.doneAt=ts;await put('claims',c);await ev(id,'statut',o,st);draw()}
 async function tr(id){const d=prompt('Service / destinataire ?');const w=d&&prompt('Motif ?');if(!d||!w)return alert('Destinataire et motif obligatoires.');await up(id,'transferee',{dest:d,why:w,transferAt:new Date().toISOString()})}
 async function canc(id){const w=prompt('Motif de l\'annulation ?');if(!w)return alert('Motif obligatoire.');const c=(await all('claims')).find(y=>y.id==id);c.cancelled=true;c.cancelWhy=w;await put('claims',c);await ev(id,'annulation',null,w,w);draw()}
 let P=null;
 function form(step){const m=$('m');
  if(P){m.innerHTML=`<div class="c"><p>${t('recap')} <b>${esc(P.contract)}</b></p><p>${esc(P.type)} · ${t(P.prio)}<br>${esc(P.notes)}</p></div><button class="s" onclick="saveC()">${t('ok')}</button><button onclick="P=null;form()">${t('back')}</button>`;return}
- m.innerHTML=`<label>${t('contract')}*</label><input id="fc" inputmode="text"><label>${t('type')}</label><select id="ft">${TR.fr.types.map((x,i)=>`<option value="${TR.fr.types[i]}">${t('types')[i]}</option>`).join('')}</select>
+ m.innerHTML=`<label>${t('contract')}*</label><input id="fc" inputmode="text" placeholder="ex. 13.10.01"><label>${t('type')}</label><select id="ft">${TR.fr.types.map((x,i)=>`<option value="${TR.fr.types[i]}">${t('types')[i]}</option>`).join('')}</select>
  <label>${t('prio')}</label><select id="fp">${['normale','urgente','faible'].map(x=>`<option value="${x}">${t(x)}</option>`).join('')}</select><label>${t('notes')}</label><textarea id="fn"></textarea><button class="s" onclick="rec()">OK</button>`}
 function rec(){const c=norm($('fc').value);if(!c)return alert('Le numéro de contrat est obligatoire.');P={contract:c,type:$('ft').value,prio:$('fp').value,notes:$('fn').value};form()}
 async function saveC(){const c={id:uid(),...P,status:'nouvelle',created:new Date().toISOString(),sync:'local'};await put('claims',c);await ev(c.id,'création',null,c.contract);P=null;V='claims';draw()}
 function meterView(M){const m=$('m');
  m.innerHTML=`<input id="q" placeholder="${t('search')}" oninput="sm()"><div id="r"></div>`;window.MM=M;sm()}
-function sm(){const q=norm($('q').value||'').toLowerCase();$('r').innerHTML=window.MM.filter(x=>!q||norm(x.contract).toLowerCase().includes(q)||(x.meterNo||'').toLowerCase().includes(q)).map(x=>
+function sm(){const q=key($('q').value||'').toLowerCase();$('r').innerHTML=window.MM.filter(x=>!q||key(x.contract).toLowerCase().includes(q)||(x.meterNo||'').toLowerCase().includes(q)).map(x=>
  `<div class="c"><b>${esc(x.contract)}</b> ${x.demo?'<span class="b demo">DÉMO</span>':''}<br>${x.lat!=null?`${x.lat.toFixed(5)}, ${x.lon.toFixed(5)} — ±${x.acc??'?'} m (${x.mode})<br><a href="https://www.google.com/maps/dir/?api=1&destination=${x.lat},${x.lon}">Itinéraire</a>`:'—'}<br><small>${syncL(x)}</small>
  <button onclick="gps('${x.id}')">${t('savegps')}</button></div>`).join('')+`<button class="s" onclick="addM()">+ Compteur</button>`}
 async function addM(){const c=norm(prompt('N° de contrat ?')||'');if(!c)return;await put('meters',{id:uid(),contract:c,meterNo:prompt('N° compteur (facultatif)')||'',lat:null,lon:null,hist:[]});draw()}
@@ -76,10 +76,10 @@ async function seed(){const T=['fuite','manque d\'eau','compteur'],S=['nouvelle'
  await put('meters',{id:uid(),contract:'DEMO-0001',meterNo:'DEMO-M1',lat:null,lon:null,demo:true});draw()}
 const TB={claims:'claims',meters:'meters',res:'reservations'};
 const tid=n=>((window.TT||[]).find(x=>x.name==n)||{}).id||null,tnm=i=>((window.TT||[]).find(x=>x.id==i)||{}).name||'';
-const ROW={claims:c=>({id:c.id,contract:c.contract,type:c.type,priority:c.prio,status:c.status,team_id:tid(c.team),notes:c.notes||null,received_at:c.receivedAt||(c.received?c.created:null),cancelled:!!c.cancelled,cancel_reason:c.cancelWhy||null,transfer_to:c.dest||null,transfer_reason:c.why||null,transferred_at:c.transferAt||null,demo:false,created_by:S.user.id,created_at:c.created}),
+const ROW={claims:c=>({id:c.id,contract:c.contract,type:c.type,priority:c.prio,status:c.status,team_id:tid(c.team),notes:c.notes||null,received_at:c.receivedAt||(c.received?c.created:null),cancelled:!!c.cancelled,cancel_reason:c.cancelWhy||null,transfer_to:c.dest||null,transfer_reason:c.why||null,transferred_at:c.transferAt||null,demo:false,details:{assignedAt:c.assignedAt||null,startedAt:c.startedAt||null,doneAt:c.doneAt||null,method:c.method||null,materials:c.materials||null,result:c.result||null},created_by:S.user.id,created_at:c.created}),
  meters:m=>({id:m.id,contract:m.contract,meter_no:m.meterNo||null,lat:m.lat,lon:m.lon,accuracy_m:m.acc??null,source:m.lat==null?null:(m.mode=='GPS mesuré'?'gps':'manuel'),author:S.user.id}),
  res:x=>({id:x.id,item:x.item,qty:x.qty,team_id:tid(x.team),day:x.day,reason:x.why||null,contract:x.contract||null,author:S.user.id})};
-const LOC={claims:r=>({id:r.id,contract:r.contract,type:r.type,prio:r.priority,status:r.status,team:tnm(r.team_id),notes:r.notes,received:!!r.received_at,receivedAt:r.received_at,cancelled:r.cancelled,cancelWhy:r.cancel_reason,dest:r.transfer_to,why:r.transfer_reason,transferAt:r.transferred_at,created:r.created_at}),
+const LOC={claims:r=>({id:r.id,contract:r.contract,type:r.type,prio:r.priority,status:r.status,team:tnm(r.team_id),notes:r.notes,received:!!r.received_at,receivedAt:r.received_at,cancelled:r.cancelled,cancelWhy:r.cancel_reason,dest:r.transfer_to,why:r.transfer_reason,transferAt:r.transferred_at,...(r.details||{}),created:r.created_at}),
  meters:r=>({id:r.id,contract:r.contract,meterNo:r.meter_no||'',lat:r.lat,lon:r.lon,acc:r.accuracy_m,mode:r.source=='gps'?'GPS mesuré':(r.source?'Choisi manuellement':undefined)}),
  res:r=>({id:r.id,item:r.item,qty:r.qty,team:tnm(r.team_id),day:r.day,why:r.reason,contract:r.contract})};
 const syncL=x=>x.demo?'Démo (local)':x.sync=='synced'?'Synchronisé':x.sync=='failed'?'Échec de synchronisation':'En attente de synchronisation';
@@ -96,6 +96,11 @@ async function sync(manual){if(syncing||!S||!db)return;syncing=true;let ok=0,bad
  syncing=false;if(S&&['home','claims','meters','res','rep'].includes(V)&&!(document.activeElement&&document.activeElement.matches('input,textarea,select')))await draw();
  const el=$('sy');if(el)el.textContent=(bad?'⚠ '+bad+' échec(s) : '+msg+'. ':'')+(ok?ok+' envoyé(s). ':'')+(manual&&!bad&&!msg?'Synchronisé ✓':'')}
 addEventListener('online',()=>sync());
+const teamL=n=>{if(!n)return n;const t=(window.TT||[]).find(x=>x.name==n);const l=(window.LD||[]).filter(x=>t&&x.team_id==t.id).map(x=>((x.first_name||'')+' '+(x.last_name||'')).trim()).join(' / ');return l?n+' — chef : '+l:n};const fd=d=>d?new Date(d).toLocaleString('fr-FR'):'';
+const det=c=>[['Équipe',c.team?teamL(c.team):'non affectée'],['Notes',c.notes],['Créée le',fd(c.created)],['Affectée le',fd(c.assignedAt)],['Réception confirmée le',fd(c.receivedAt)],['Intervention démarrée le',fd(c.startedAt)],['Traitée le',fd(c.doneAt)],
+ ['Transfert vers',c.dest],['Motif du transfert',c.why],['Transférée le',fd(c.transferAt)],['Méthode de traitement',c.method],['Matériaux utilisés',c.materials],['Résultat / observations',c.result],["Motif d'annulation",c.cancelWhy]]
+ .filter(x=>x[1]).map(x=>`<div style="font-size:15px"><b>${x[0]} :</b> ${esc(x[1])}</div>`).join('');
+async function done(id){const m=prompt('Méthode de traitement (réparation, remplacement de pièce, recherche de fuite, transfert à un prestataire...) :');if(m===null)return;const mat=prompt('Matériaux utilisés et quantités (facultatif) :')||'';const res=prompt('Résultat et observations du traitement (obligatoire) :');if(!res||!res.trim())return alert('Le résultat est obligatoire pour clôturer.');await up(id,'traitee',{method:m,materials:mat,result:res})}
 const fn=b=>api('/functions/v1/dynamic-task',{method:'POST',body:JSON.stringify(b)});
 async function empReset(id){const p=prompt('Nouveau mot de passe provisoire (8 caractères min.) :');if(!p)return;if(p.length<8)return alert('8 caractères minimum.');const r=await fn({action:'reset_password',id,password:p});const j=await r.json().catch(()=>({}));alert(r.ok?"Mot de passe réinitialisé. Communiquez-le à l'employé.":'Échec : '+(j.error||r.status))}
 async function empView(){const m=$('m');m.textContent='…';try{const [r,rt]=await Promise.all([api('/rest/v1/profiles?select=*&order=last_name'),api('/rest/v1/teams?select=id,name&order=name')]);const E=await r.json();if(!r.ok)throw new Error(E.message||r.status);window.EE=E;window.TT=rt.ok?await rt.json():[];
@@ -128,15 +133,15 @@ async function saveR(){const q=+$('rq').value,i=$('ri').value.trim();if(!i||!(q>
  await put('res',{id:uid(),item:i,contract:norm($('rc').value),qty:q,team:$('rt').value,day:$('rd').value||td(),why:$('rr').value,created:new Date().toISOString()});resView()}
 const cnt=(a,f)=>{const o={};a.forEach(x=>{const k=f(x)||'—';o[k]=(o[k]||0)+1});return Object.entries(o).map(([k,v])=>`<div>${esc(k)} : <b>${v}</b></div>`).join('')||'—'};
 async function repView(){const C=await all('claims'),R=await all('res'),T=td(),A=C.filter(c=>!c.cancelled),X=C.filter(c=>c.cancelled),O=A.filter(c=>c.status!='traitee');
- const nw=A.filter(c=>dk(c.created)==T);
+ const nw=A.filter(c=>dk(c.created)==T);const LST=A.filter(c=>c.status!='traitee'||dk(c.created)==T||(c.doneAt&&dk(c.doneAt)==T)).sort((a,b)=>b.created.localeCompare(a.created));const card=c=>`<div class="c"><b>${esc(c.contract)}</b> · ${esc(c.type)}<br>${bd(c)}<div style="margin-top:6px">${det(c)}</div></div>`;
  $('m').innerHTML=`<h2>Rapport journalier — ${T}</h2><p style="font-size:14px">Fuseau de l'appareil, journée 00:00–23:59. Données locales.</p>
  <div class="g"><div class="c"><div class="n">${nw.length}</div>Nouvelles du jour</div><div class="c"><div class="n">${O.length}</div>Ouvertes (dont ${O.filter(c=>dk(c.created)<T).length} anciennes)</div></div>
  <div class="c"><b>Par statut</b>${cnt(O.concat(A.filter(c=>c.status=='traitee')),c=>t(c.status))}</div>
- <div class="c"><b>Par équipe</b>${cnt(A,c=>c.team)}</div><div class="c"><b>Par type</b>${cnt(A,c=>c.type)}</div>
+ <div class="c"><b>Par équipe</b>${cnt(A,c=>teamL(c.team))}</div><div class="c"><b>Par type</b>${cnt(A,c=>c.type)}</div>
  <div class="c"><b>Transférées</b> : ${A.filter(c=>c.status=='transferee').length}</div>
  <div class="c"><b>Annulées (séparées, non comptées)</b> : ${X.length}</div>
  <div class="c"><b>Réservations du jour</b>${cnt(R.filter(x=>x.day==T),x=>x.item+' ×'+x.qty+(x.contract?' @'+x.contract:''))}</div>
- <button onclick="window.print()">Exporter en PDF (Imprimer → Enregistrer en PDF)</button>`}
+ <h3>Détail des réclamations (${LST.length})</h3>${LST.map(card).join('')||t('empty')}<h3>Réclamations annulées (${X.length})</h3>${X.map(card).join('')||'—'}<button onclick="window.print()">Exporter en PDF (Imprimer → Enregistrer en PDF)</button>`}
 const SB='https://uzvebghzshrygtrdwxsv.supabase.co',KEY='sb_publishable_Bf0QdSJ7CZ1Q1P-LLMJn9A_0dodgZkj';
 let S=null,idle;const ST={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const api=async(p,o={})=>{const x=await fetch(SB+p,{...o,headers:{apikey:KEY,'Content-Type':'application/json',...(S?{Authorization:'Bearer '+S.access_token}:{}),...(o.headers||{})}});if(x.status==401&&S&&!p.includes('/auth/'))out('Session expirée, reconnectez-vous.');return x};
@@ -146,7 +151,7 @@ async function login(){const lk=+ST.get('lock')||0;if(Date.now()<lk)return $('lm
  if(!r.ok){const n=(+ST.get('fails')||0)+1;ST.set('fails',n);if(n>=5){ST.set('lock',Date.now()+3e5);ST.set('fails',0)}return $('lm').textContent='Identifiants incorrects.'}
  ST.set('fails',0);S=j;const pr=await api('/rest/v1/profiles?id=eq.'+j.user.id+'&select=role,first_name,last_name,active');const p=(await pr.json())[0];
  if(!p||!p.active){S=null;return $('lm').textContent='Compte sans profil actif. Contactez l\'administrateur.'}
- S.profile=p;db=await open('dm_'+j.user.id);try{const tr=await api('/rest/v1/teams?select=id,name');window.TT=tr.ok?await tr.json():[]}catch(e){window.TT=[]}$('who').textContent=(p.first_name||'')+' · '+p.role;V='home';draw();arm();sync()}catch(e){$('lm').textContent='Connexion au serveur impossible : '+e.message}}
+ S.profile=p;db=await open('dm_'+j.user.id);try{const tr=await api('/rest/v1/teams?select=id,name');window.TT=tr.ok?await tr.json():[]}catch(e){window.TT=[]}try{const lr=await api('/rest/v1/rpc/team_leads',{method:'POST',body:'{}'});window.LD=lr.ok?await lr.json():[]}catch(e){window.LD=[]}$('who').textContent=(p.first_name||'')+' · '+p.role;V='home';draw();arm();sync()}catch(e){$('lm').textContent='Connexion au serveur impossible : '+e.message}}
 async function out(msg){const tk=S;S=null;clearTimeout(idle);loginUI(typeof msg=='string'?msg:'');try{if(tk)await fetch(SB+'/auth/v1/logout',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+tk.access_token}})}catch(e){}}
 function arm(){clearTimeout(idle);if(S)idle=setTimeout(out,3e5)}
 ['click','keydown','touchstart'].forEach(e=>document.addEventListener(e,arm));
