@@ -96,7 +96,7 @@ async function sync(manual){if(syncing||!S||!db)return;syncing=true;let ok=0,bad
  syncing=false;if(S&&['home','claims','meters','res','rep'].includes(V)&&!(document.activeElement&&document.activeElement.matches('input,textarea,select')))await draw();
  const el=$('sy');if(el)el.textContent=(bad?'⚠ '+bad+' échec(s) : '+msg+'. ':'')+(ok?ok+' envoyé(s). ':'')+(manual&&!bad&&!msg?'Synchronisé ✓':'')}
 addEventListener('online',()=>sync());
-const teamL=n=>{if(!n)return n;const t=(window.TT||[]).find(x=>x.name==n);const l=(window.LD||[]).filter(x=>t&&x.team_id==t.id).map(x=>((x.first_name||'')+' '+(x.last_name||'')).trim()).join(' / ');return l?n+' — chef : '+l:n};const fd=d=>d?new Date(d).toLocaleString('fr-FR'):'';
+const teamL=n=>{if(!n)return n;const t=(window.TT||[]).find(x=>x.name==n);const l=(window.LD||[]).filter(x=>t&&x.team_id==t.id).map(x=>((x.first_name||'')+' '+(x.last_name||'')).trim()).join(' / ');return l?n+' — '+l:n};const fd=d=>d?new Date(d).toLocaleString('fr-FR'):'';
 const det=c=>[['Équipe',c.team?teamL(c.team):'non affectée'],['Notes',c.notes],['Créée le',fd(c.created)],['Affectée le',fd(c.assignedAt)],['Réception confirmée le',fd(c.receivedAt)],['Intervention démarrée le',fd(c.startedAt)],['Traitée le',fd(c.doneAt)],
  ['Transfert vers',c.dest],['Motif du transfert',c.why],['Transférée le',fd(c.transferAt)],['Méthode de traitement',c.method],['Matériaux utilisés',c.materials],['Résultat / observations',c.result],["Motif d'annulation",c.cancelWhy]]
  .filter(x=>x[1]).map(x=>`<div style="font-size:15px"><b>${x[0]} :</b> ${esc(x[1])}</div>`).join('');
