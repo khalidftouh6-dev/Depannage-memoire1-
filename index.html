@@ -1,30 +1,108 @@
-
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dépannage-mémoire</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
-            color: #fff;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .container { text-align: center; padding: 2rem; }
-        h1 { font-size: 2rem; color: #e94560; margin-bottom: 1rem; }
-        p { font-size: 1.1rem; color: #aaa; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🔧 Dépannage-mémoire</h1>
-        <p>Application en cours de développement...</p>
-    </div>
-</body>
-</html>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dépannage Mémoire</title>
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0e3a4a"><link rel="icon" href="icon.svg">
+<style>
+:root{--bg:#f3f7f8;--ink:#10262e;--deep:#0e3a4a;--sun:#f2b632;--card:#fff;--line:#c9d9de}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1d24;--ink:#e6f0f2;--card:#122b35;--line:#2a4852}}
+*{box-sizing:border-box}body{margin:0;font:17px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:70px}
+header{background:var(--deep);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0}
+h1{font-size:19px;margin:0}main{padding:14px;max-width:640px;margin:auto}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:10px}.c{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+.n{font-size:34px;font-weight:700}button,select,input,textarea{font:inherit;min-height:48px;border-radius:8px;border:1px solid var(--line);padding:8px 12px;width:100%;margin:4px 0;background:var(--card);color:var(--ink)}
+button{background:var(--deep);color:#fff;border:0;font-weight:600}button.s{background:var(--sun);color:#10262e}button.x{background:#9b2c2c}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--deep)}nav button{border-radius:0;margin:0;background:none;font-size:14px}
+.b{display:inline-block;padding:2px 8px;border-radius:6px;font-size:14px;font-weight:600}
+.urgente{background:#c0392b;color:#fff}.normale{background:#f2b632}.faible{background:#2e8b57;color:#fff}.demo{background:#ddd;color:#333}
+@media print{header,nav,button{display:none}body{padding:0}}nav button{font-size:12px;padding:6px}</style></head><body><header><h1>💧 Dépannage Mémoire</h1><span id="who" style="font-size:13px"></span><span style="display:flex;gap:6px"><button style="width:auto;min-height:36px" onclick="L=L=='fr'?'ar':'fr';S?draw():loginUI()">FR/عربي</button><button class="x" style="width:auto;min-height:36px" onclick="out()">⏻</button></span></header>
+<main id="m"></main><nav id="nv"></nav>
+<script>
+const TR={fr:{home:"Accueil",res:"Réservations",rep:"Rapport",claims:"Réclamations",meters:"Compteurs",neu:"Nouvelle réclamation",contract:"N° de contrat",type:"Type",prio:"Priorité",team:"Équipe",notes:"Notes",recap:"Récapitulatif — contrat normalisé :",ok:"Confirmer et enregistrer",back:"Corriger",
+ nouvelle:"Nouvelle",affectee:"Affectée",en_cours:"En cours",traitee:"Traitée",transferee:"Transférée",urgente:"Urgente",normale:"Normale",faible:"Faible",search:"Contrat ou n° de compteur",savegps:"Enregistrer la position du compteur",
+ demo:"Charger données de démonstration",empty:"Rien ici pour l'instant.",assign:"Affecter",recv:"Confirmer réception",start:"Démarrer",done:"Marquer traitée",transfer:"Transférer",cancel:"Annuler (motif requis)",hist:"réclamation(s) pour ce contrat",
+ local:"Enregistré localement",types:["fuite","manque d'eau","compteur","autre","non précisé"]},
+ar:{home:"الرئيسية",res:"الحجوزات",rep:"التقرير",claims:"الشكاوى",meters:"العدادات",neu:"شكوى جديدة",contract:"رقم العقد",type:"النوع",prio:"الأولوية",team:"الفريق",notes:"ملاحظات",recap:"ملخص — رقم العقد بعد التوحيد:",ok:"تأكيد وحفظ",back:"تعديل",
+ nouvelle:"جديدة",affectee:"مُسندة",en_cours:"قيد التنفيذ",traitee:"معالجة",transferee:"محوّلة",urgente:"عاجلة",normale:"عادية",faible:"منخفضة",search:"العقد أو رقم العداد",savegps:"تسجيل موقع العداد",
+ demo:"تحميل بيانات تجريبية",empty:"لا شيء بعد.",assign:"إسناد",recv:"تأكيد الاستلام",start:"بدء",done:"تمت المعالجة",transfer:"تحويل",cancel:"إلغاء (السبب مطلوب)",hist:"شكوى لهذا العقد",
+ local:"محفوظ محليًا",types:["تسرب","انقطاع الماء","عداد","أخرى","غير محدد"]}};
+let L='fr',V='home',D=null,db;const t=k=>TR[L][k]||k,$=s=>document.getElementById(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const open=()=>new Promise(r=>{const q=indexedDB.open('dm',2);q.onupgradeneeded=()=>{['claims','meters','events','res'].forEach(s=>{if(!q.result.objectStoreNames.contains(s))q.result.createObjectStore(s,{keyPath:'id'})})};q.onsuccess=()=>r(q.result)});
+const all=s=>new Promise(r=>{const q=db.transaction(s).objectStore(s).getAll();q.onsuccess=()=>r(q.result)});
+const put=(s,o)=>new Promise(r=>{const q=db.transaction(s,'readwrite').objectStore(s).put(o);q.onsuccess=()=>r()});
+const uid=()=>crypto.randomUUID();
+// normalisation : retire seulement espaces/séparateurs usuels, n'altère ni n'ajoute aucun caractère
+const norm=s=>s.replace(/[\s.\-_\/]+/g,'');
+const ev=(rec,op,o,n,why)=>put('events',{id:uid(),at:new Date().toISOString(),op,rec,old:o,new:n,why});
+function bd(c){return `<span class="b ${c.prio}">${t(c.prio)}</span> <span class="b" style="background:var(--line)">${t(c.status)}</span>${c.demo?' <span class="b demo">DÉMO</span>':''}${c.cancelled?' <span class="b x" style="color:#fff">ANNULÉE</span>':''}`}
+async function draw(){document.dir=L=='ar'?'rtl':'ltr';
+ $('nv').innerHTML=[['home','home'],['claims','claims'],['meters','meters'],['res','res'],['rep','rep']].map(([v,k])=>`<button onclick="V='${v}';D=null;draw()">${t(k)}</button>`).join('');
+ const C=await all('claims'),M=await all('meters');const m=$('m');
+ if(V=='home'){m.innerHTML=`<div class="g">${['nouvelle','affectee','en_cours','traitee','transferee'].map(s=>`<div class="c" onclick="V='claims';F='${s}';draw()"><div class="n">${C.filter(c=>c.status==s&&!c.cancelled).length}</div>${t(s)}</div>`).join('')}</div>
+ <button class="s" onclick="V='new';draw()">+ ${t('neu')}</button><button onclick="seed()">${t('demo')}</button>
+ <p style="font-size:14px">Mode local (sans serveur). Données stockées sur cet appareil uniquement. Annulées exclues des chiffres.</p>`}
+ if(V=='claims'){const l=C.filter(c=>!window.F||c.status==F).sort((a,b)=>b.created.localeCompare(a.created));window.F=null;
+  m.innerHTML=`<button class="s" onclick="V='new';draw()">+ ${t('neu')}</button>`+(l.map(c=>`<div class="c" onclick="D='${c.id}';V='det';draw()"><b>${esc(c.contract)}</b> · ${esc(c.type)}<br>${bd(c)}<br><small>${new Date(c.created).toLocaleString()}${c.team?' · '+esc(c.team):''}</small></div>`).join('')||t('empty'))}
+ if(V=='new')form();
+ if(V=='det'){const c=C.find(x=>x.id==D),n=C.filter(x=>x.contract==c.contract).length-1;
+  m.innerHTML=`<div class="c"><h2>${esc(c.contract)}</h2>${bd(c)}<p>${esc(c.type)} — ${esc(c.notes)}</p><p>${n} ${t('hist')} (+)</p>`+acts(c)+`</div>`}
+ if(V=='meters')meterView(M);if(V=='res')resView();if(V=='rep')repView()}
+function acts(c){if(c.cancelled)return'';const s=c.status;let h='';
+ if(s=='nouvelle')h+=`<select id="tm">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><button onclick="up('${c.id}','affectee',{team:$('tm').value})">${t('assign')}</button>`;
+ if(s=='affectee'&&!c.received)h+=`<button onclick="up('${c.id}','affectee',{received:true})">${t('recv')}</button>`;
+ if(s=='affectee'&&c.received)h+=`<button onclick="up('${c.id}','en_cours')">${t('start')}</button>`;
+ if(s=='en_cours'||s=='transferee')h+=`<button class="s" onclick="up('${c.id}','traitee')">${t('done')}</button>`;
+ if(s=='en_cours'||s=='transferee')h+=`<button onclick="tr('${c.id}')">${t('transfer')}</button>`;
+ return h+`<button class="x" onclick="canc('${c.id}')">${t('cancel')}</button>`}
+async function up(id,st,x={}){const c=(await all('claims')).find(y=>y.id==id),o=c.status;Object.assign(c,x,{status:st});await put('claims',c);await ev(id,'statut',o,st);draw()}
+async function tr(id){const d=prompt('Service / destinataire ?');const w=d&&prompt('Motif ?');if(!d||!w)return alert('Destinataire et motif obligatoires.');await up(id,'transferee',{dest:d,why:w,transferAt:new Date().toISOString()})}
+async function canc(id){const w=prompt('Motif de l\'annulation ?');if(!w)return alert('Motif obligatoire.');const c=(await all('claims')).find(y=>y.id==id);c.cancelled=true;c.cancelWhy=w;await put('claims',c);await ev(id,'annulation',null,w,w);draw()}
+let P=null;
+function form(step){const m=$('m');
+ if(P){m.innerHTML=`<div class="c"><p>${t('recap')} <b>${esc(P.contract)}</b></p><p>${esc(P.type)} · ${t(P.prio)}<br>${esc(P.notes)}</p></div><button class="s" onclick="saveC()">${t('ok')}</button><button onclick="P=null;form()">${t('back')}</button>`;return}
+ m.innerHTML=`<label>${t('contract')}*</label><input id="fc" inputmode="text"><label>${t('type')}</label><select id="ft">${TR.fr.types.map((x,i)=>`<option value="${TR.fr.types[i]}">${t('types')[i]}</option>`).join('')}</select>
+ <label>${t('prio')}</label><select id="fp">${['normale','urgente','faible'].map(x=>`<option value="${x}">${t(x)}</option>`).join('')}</select><label>${t('notes')}</label><textarea id="fn"></textarea><button class="s" onclick="rec()">OK</button>`}
+function rec(){const c=norm($('fc').value);if(!c)return alert('Le numéro de contrat est obligatoire.');P={contract:c,type:$('ft').value,prio:$('fp').value,notes:$('fn').value};form()}
+async function saveC(){const c={id:uid(),...P,status:'nouvelle',created:new Date().toISOString(),sync:'local'};await put('claims',c);await ev(c.id,'création',null,c.contract);P=null;V='claims';draw()}
+function meterView(M){const m=$('m');
+ m.innerHTML=`<input id="q" placeholder="${t('search')}" oninput="sm()"><div id="r"></div>`;window.MM=M;sm()}
+function sm(){const q=norm($('q').value||'').toLowerCase();$('r').innerHTML=window.MM.filter(x=>!q||x.contract.toLowerCase().includes(q)||(x.meterNo||'').toLowerCase().includes(q)).map(x=>
+ `<div class="c"><b>${esc(x.contract)}</b> ${x.demo?'<span class="b demo">DÉMO</span>':''}<br>${x.lat!=null?`${x.lat.toFixed(5)}, ${x.lon.toFixed(5)} — ±${x.acc??'?'} m (${x.mode})<br><a href="https://www.google.com/maps/dir/?api=1&destination=${x.lat},${x.lon}">Itinéraire</a>`:'—'}<br><small>${t('local')}</small>
+ <button onclick="gps('${x.id}')">${t('savegps')}</button></div>`).join('')+`<button class="s" onclick="addM()">+ Compteur</button>`}
+async function addM(){const c=norm(prompt('N° de contrat ?')||'');if(!c)return;await put('meters',{id:uid(),contract:c,meterNo:prompt('N° compteur (facultatif)')||'',lat:null,lon:null,hist:[]});draw()}
+function gps(id){if(!navigator.geolocation)return alert('GPS indisponible.');navigator.geolocation.getCurrentPosition(async p=>{const a=Math.round(p.coords.accuracy);
+ if(!confirm(`Position mesurée : ${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)} (±${a} m). Enregistrer ?`))return;
+ const x=(await all('meters')).find(y=>y.id==id);(x.hist=x.hist||[]).push({lat:x.lat,lon:x.lon,at:new Date().toISOString()});Object.assign(x,{lat:p.coords.latitude,lon:p.coords.longitude,acc:a,mode:'GPS mesuré',sync:'local'});await put('meters',x);await ev(id,'gps',null,[x.lat,x.lon]);draw()},e=>alert('GPS refusé ou indisponible : '+e.message),{enableHighAccuracy:true,timeout:20000})}
+async function seed(){const T=['fuite','manque d\'eau','compteur'],S=['nouvelle','affectee','en_cours','traitee','transferee'];
+ for(let i=0;i<5;i++)await put('claims',{id:uid(),contract:'DEMO-000'+(i+1),type:T[i%3],prio:['urgente','normale','faible'][i%3],status:S[i],team:i?'Équipe '+i:'',received:i>1,notes:'Donnée de démonstration',created:new Date(Date.now()-i*36e5).toISOString(),demo:true});
+ await put('meters',{id:uid(),contract:'DEMO-0001',meterNo:'DEMO-M1',lat:null,lon:null,demo:true});draw()}
+const dk=d=>new Date(d).toLocaleDateString('sv'),td=()=>dk(Date.now());
+async function resView(){const R=(await all('res')).sort((a,b)=>b.day.localeCompare(a.day));
+ $('m').innerHTML=`<div class="c"><input id="ri" placeholder="Matériel demandé"><input id="rq" type="number" min="1" placeholder="Quantité"><select id="rt">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><input id="rd" type="date" value="${td()}"><input id="rr" placeholder="Motif"><button class="s" onclick="saveR()">Enregistrer la demande</button></div>`+
+ (R.map(x=>`<div class="c"><b>${esc(x.item)}</b> × ${x.qty}<br>${esc(x.team)} · ${x.day}<br><small>${esc(x.why)}</small></div>`).join('')||t('empty'))}
+async function saveR(){const q=+$('rq').value,i=$('ri').value.trim();if(!i||!(q>0))return alert('Matériel et quantité (≥ 1) obligatoires.');
+ await put('res',{id:uid(),item:i,qty:q,team:$('rt').value,day:$('rd').value||td(),why:$('rr').value,created:new Date().toISOString()});resView()}
+const cnt=(a,f)=>{const o={};a.forEach(x=>{const k=f(x)||'—';o[k]=(o[k]||0)+1});return Object.entries(o).map(([k,v])=>`<div>${esc(k)} : <b>${v}</b></div>`).join('')||'—'};
+async function repView(){const C=await all('claims'),R=await all('res'),T=td(),A=C.filter(c=>!c.cancelled),X=C.filter(c=>c.cancelled),O=A.filter(c=>c.status!='traitee');
+ const nw=A.filter(c=>dk(c.created)==T);
+ $('m').innerHTML=`<h2>Rapport journalier — ${T}</h2><p style="font-size:14px">Fuseau de l'appareil, journée 00:00–23:59. Données locales.</p>
+ <div class="g"><div class="c"><div class="n">${nw.length}</div>Nouvelles du jour</div><div class="c"><div class="n">${O.length}</div>Ouvertes (dont ${O.filter(c=>dk(c.created)<T).length} anciennes)</div></div>
+ <div class="c"><b>Par statut</b>${cnt(O.concat(A.filter(c=>c.status=='traitee')),c=>t(c.status))}</div>
+ <div class="c"><b>Par équipe</b>${cnt(A,c=>c.team)}</div><div class="c"><b>Par type</b>${cnt(A,c=>c.type)}</div>
+ <div class="c"><b>Transférées</b> : ${A.filter(c=>c.status=='transferee').length}</div>
+ <div class="c"><b>Annulées (séparées, non comptées)</b> : ${X.length}</div>
+ <div class="c"><b>Réservations du jour</b>${cnt(R.filter(x=>x.day==T),x=>x.item+' ×'+x.qty)}</div>
+ <button onclick="window.print()">Exporter en PDF (Imprimer → Enregistrer en PDF)</button>`}
+const SB='https://uzvebghzshrygtrdwxsv.supabase.co',KEY='sb_publishable_Bf0QdSJ7CZ1Q1P-LLMJn9A_0dodgZkj';
+let S=null,idle;const ST={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+const api=(p,o={})=>fetch(SB+p,{...o,headers:{apikey:KEY,'Content-Type':'application/json',...(S?{Authorization:'Bearer '+S.access_token}:{}),...(o.headers||{})}});
+function loginUI(msg=''){document.dir=L=='ar'?'rtl':'ltr';$('nv').innerHTML='';$('who').textContent='';$('m').innerHTML=`<div class="c"><h2>Connexion</h2><input id="le" type="email" autocomplete="username" placeholder="E-mail professionnel"><input id="lp" type="password" autocomplete="current-password" placeholder="Mot de passe"><label><input type="checkbox" style="width:auto;min-height:0" onchange="$('lp').type=this.checked?'text':'password'"> Afficher le mot de passe</label><button class="s" onclick="login()">Se connecter</button><p id="lm" style="color:#c0392b">${msg}</p></div>`}
+async function login(){const lk=+ST.get('lock')||0;if(Date.now()<lk)return $('lm').textContent='Trop d\'échecs. Réessayez dans '+Math.ceil((lk-Date.now())/6e4)+' min.';
+ try{const r=await api('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email:$('le').value.trim(),password:$('lp').value})});const j=await r.json();
+ if(!r.ok){const n=(+ST.get('fails')||0)+1;ST.set('fails',n);if(n>=5){ST.set('lock',Date.now()+3e5);ST.set('fails',0)}return $('lm').textContent='Identifiants incorrects.'}
+ ST.set('fails',0);S=j;const pr=await api('/rest/v1/profiles?id=eq.'+j.user.id+'&select=role,first_name,last_name,active');const p=(await pr.json())[0];
+ if(!p||!p.active){S=null;return $('lm').textContent='Compte sans profil actif. Contactez l\'administrateur.'}
+ S.profile=p;$('who').textContent=(p.first_name||'')+' · '+p.role;V='home';draw();arm()}catch(e){$('lm').textContent='Connexion au serveur impossible : '+e.message}}
+async function out(){try{if(S)await api('/auth/v1/logout',{method:'POST'})}catch(e){}S=null;clearTimeout(idle);loginUI()}
+function arm(){clearTimeout(idle);if(S)idle=setTimeout(out,3e5)}
+['click','keydown','touchstart'].forEach(e=>document.addEventListener(e,arm));
+open().then(d=>{db=d;loginUI()});if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+</script></body></html>
