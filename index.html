@@ -12,7 +12,7 @@ button{background:var(--deep);color:#fff;border:0;font-weight:600}button.s{backg
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--deep)}nav button{border-radius:0;margin:0;background:none;font-size:14px}
 .b{display:inline-block;padding:2px 8px;border-radius:6px;font-size:14px;font-weight:600}
 .urgente{background:#c0392b;color:#fff}.normale{background:#f2b632}.faible{background:#2e8b57;color:#fff}.demo{background:#ddd;color:#333}
-@media print{header,nav,button{display:none}body{padding:0}}nav button{font-size:12px;padding:6px}</style></head><body><header><h1>💧 Dépannage Mémoire</h1><span id="who" style="font-size:13px"></span><span style="display:flex;gap:6px"><button style="width:auto;min-height:36px" onclick="L=L=='fr'?'ar':'fr';S?draw():loginUI()">FR/عربي</button><button class="x" style="width:auto;min-height:36px" onclick="out()">Sortir</button></span></header>
+@media print{header,nav,button{display:none}body{padding:0}}nav button{font-size:12px;padding:6px}</style></head><body><header><h1>💧 Dépannage Mémoire <small style="font-size:11px;opacity:.7">v1.0</small></h1><span id="who" style="font-size:13px"></span><span style="display:flex;gap:6px"><button style="width:auto;min-height:36px" onclick="L=L=='fr'?'ar':'fr';S?draw():loginUI()">FR/عربي</button><button class="x" style="width:auto;min-height:36px" onclick="out()">Sortir</button></span></header>
 <main id="m"></main><nav id="nv"></nav>
 <script>
 const TR={fr:{home:"Accueil",res:"Réservations",emp:"Employés",rep:"Rapport",claims:"Réclamations",meters:"Compteurs",neu:"Nouvelle réclamation",contract:"N° de contrat",type:"Type",prio:"Priorité",team:"Équipe",notes:"Notes",recap:"Récapitulatif — contrat normalisé :",ok:"Confirmer et enregistrer",back:"Corriger",
@@ -37,7 +37,7 @@ async function draw(){document.dir=L=='ar'?'rtl':'ltr';
  $('nv').innerHTML=[['home','home'],['claims','claims'],['meters','meters'],['res','res'],['rep','rep'],...(S&&S.profile&&S.profile.role=='admin'?[['emp','emp']]:[])].map(([v,k])=>`<button onclick="V='${v}';D=null;draw()">${t(k)}</button>`).join('');
  const C=await all('claims'),M=await all('meters');const m=$('m');
  if(V=='home'){m.innerHTML=`<div class="g">${['nouvelle','affectee','en_cours','traitee','transferee'].map(s=>`<div class="c" onclick="V='claims';F='${s}';draw()"><div class="n">${C.filter(c=>c.status==s&&!c.cancelled).length}</div>${t(s)}</div>`).join('')}</div>
- <button class="s" onclick="V='new';draw()">+ ${t('neu')}</button>${isAdm()?`<button onclick="seed()">${t('demo')}</button>`:''}<button onclick="sync(true)">Synchroniser maintenant</button><button onclick="pw()">Changer mon mot de passe</button>${isAdm()?`<button onclick="backup()">Sauvegarde (télécharger)</button>`:''}<p id="sy" style="font-size:14px"></p>
+ <button class="s" onclick="V='new';draw()">+ ${t('neu')}</button><button onclick="sync(true)">Synchroniser maintenant</button><button onclick="pw()">Changer mon mot de passe</button>${isAdm()?`<button onclick="backup()">Sauvegarde (télécharger)</button><button class="x" onclick="wipeLocal()">Vider les données locales (cet appareil)</button>`:''}<p id="sy" style="font-size:14px"></p>
  <p style="font-size:14px">Une donnée est « Synchronisée » seulement après confirmation du serveur. Hors connexion : enregistrée localement, envoyée plus tard. Annulées exclues des chiffres.</p>`}
  if(V=='claims'){const l=C.filter(c=>!window.F||c.status==F).sort((a,b)=>b.created.localeCompare(a.created));window.F=null;
   m.innerHTML=`<button class="s" onclick="V='new';draw()">+ ${t('neu')}</button>`+(l.map(c=>`<div class="c" onclick="D='${c.id}';V='det';draw()"><b>${esc(c.contract)}</b> · ${esc(c.type)}<br>${bd(c)}<br><small>${new Date(c.created).toLocaleString()}${c.team?' · '+esc(c.team):''}</small></div>`).join('')||t('empty'))}
@@ -45,12 +45,12 @@ async function draw(){document.dir=L=='ar'?'rtl':'ltr';
  if(V=='det'){const c=C.find(x=>x.id==D),n=C.filter(x=>key(x.contract)==key(c.contract)).length-1;
   m.innerHTML=`<div class="c"><h2>${esc(c.contract)}</h2>${bd(c)}<p>${esc(c.type)}</p>${det(c)}<p>${n} ${t('hist')}</p>`+acts(c)+`</div><div id="rf"></div>`;refInto($('rf'),c.contract)}
  if(V=='meters')meterView(M);if(V=='res')resView();if(V=='rep')repView();if(V=='emp')empView()}
-function acts(c){if(c.cancelled)return'';const s=c.status;let h='';
- if(s=='nouvelle')h+=`<select id="tm">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><button onclick="up('${c.id}','affectee',{team:$('tm').value})">${t('assign')}</button>`;
- if(s=='affectee'&&!c.received)h+=`<button onclick="up('${c.id}','affectee',{received:true,receivedAt:new Date().toISOString()})">${t('recv')}</button>`;
- if(s=='affectee'&&c.received)h+=`<button onclick="up('${c.id}','en_cours')">${t('start')}</button>`;
- if(s=='en_cours'||s=='transferee')h+=`<button class="s" onclick="done('${c.id}')">${t('done')}</button>`;
- if(s=='en_cours'||s=='transferee')h+=`<button onclick="tr('${c.id}')">${t('transfer')}</button>`;
+function acts(c){if(c.cancelled)return'';const s=c.status;let h='';const R=S.profile.role,own=R=='admin'||(R=='chef'&&!!S.profile.team_id&&tid(c.team)==S.profile.team_id),asg=R=='admin'||R=='reception';
+ if(s=='nouvelle'&&asg)h+=`<select id="tm">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><button onclick="up('${c.id}','affectee',{team:$('tm').value})">${t('assign')}</button>`;
+ if(s=='affectee'&&!c.received&&own)h+=`<button onclick="up('${c.id}','affectee',{received:true,receivedAt:new Date().toISOString()})">${t('recv')}</button>`;
+ if(s=='affectee'&&c.received&&own)h+=`<button onclick="up('${c.id}','en_cours')">${t('start')}</button>`;
+ if((s=='en_cours'||s=='transferee')&&own)h+=`<button class="s" onclick="done('${c.id}')">${t('done')}</button>`;
+ if((s=='en_cours'||s=='transferee')&&own)h+=`<button onclick="tr('${c.id}')">${t('transfer')}</button>`;
  if(!canEdit(c))return h;return h+`<button onclick="corr('${c.id}')">Corriger les informations</button><button class="x" onclick="canc('${c.id}')">${t('cancel')}</button>`}
 async function up(id,st,x={}){const c=(await all('claims')).find(y=>y.id==id),o=c.status;Object.assign(c,x,{status:st});const ts=new Date().toISOString();if(st=='affectee'&&x.team)c.assignedAt=ts;if(st=='en_cours')c.startedAt=ts;if(st=='traitee')c.doneAt=ts;await put('claims',c);await ev(id,'statut',o,st);draw()}
 async function tr(id){const d=prompt('Service / destinataire ?');const w=d&&prompt('Motif ?');if(!d||!w)return alert('Destinataire et motif obligatoires.');await up(id,'transferee',{dest:d,why:w,transferAt:new Date().toISOString()})}
@@ -123,6 +123,11 @@ async function refInto(el,contract){if(!el)return;el.innerHTML='';if(!norm(contr
  if(f.pts.length)out.push(`<div class="c"><b>${f.exact?'Repère trouvé pour ce numéro':f.len==1?'Repère du secteur '+esc(f.g[0])+' (séquence et maison non cartographiées)':f.len==2?'Repère du secteur '+esc(f.g[0])+', séquence '+esc(f.g[1])+' (maison non cartographiée)':'Repère le plus proche : « '+esc(f.pts[0].ref)+' »'}</b> — <i>position approximative</i>${f.pts.map((p,i)=>`<br>${f.pts.length>1?'Point '+(i+1)+' : ':''}${esc(p.label||'')} <a href="${nav(p.lat,p.lon)}">Itinéraire</a> · <a href="${mapu(p.lat,p.lon)}">Carte</a>`).join('')}</div>`);
  else if(!out.length)out.push('<div class="c"><small>Aucun repère trouvé pour ce numéro.</small></div>');
  el.innerHTML=out.join('')}
+async function wipeLocal(){if(!isAdm())return;let n=0;for(const s of ['claims','meters','res'])(await all(s)).forEach(x=>{if(x.sync!='synced'&&!x.demo)n++});
+ if(n&&!confirm(n+' élément(s) non synchronisé(s) seront perdus. Continuer ?'))return;
+ if(!confirm("Supprimer toutes les données locales de cet appareil ? Les données du serveur ne sont pas touchées."))return;
+ const uid=S.user.id;db.close();const del=nm=>new Promise(r=>{const q=indexedDB.deleteDatabase(nm);q.onsuccess=q.onerror=q.onblocked=()=>r()});
+ await del('dm_'+uid);await del('dm');db=await open('dm_'+uid);V='home';await sync(true);await draw()}
 const fn=b=>api('/functions/v1/dynamic-task',{method:'POST',body:JSON.stringify(b)});
 async function empReset(id){const p=prompt('Nouveau mot de passe provisoire (8 caractères min.) :');if(!p)return;if(p.length<8)return alert('8 caractères minimum.');const r=await fn({action:'reset_password',id,password:p});const j=await r.json().catch(()=>({}));alert(r.ok?"Mot de passe réinitialisé. Communiquez-le à l'employé.":'Échec : '+(j.error||r.status))}
 async function empView(){const m=$('m');m.textContent='…';try{const [r,rt]=await Promise.all([api('/rest/v1/profiles?select=*&order=last_name'),api('/rest/v1/teams?select=id,name&order=name')]);const E=await r.json();if(!r.ok)throw new Error(E.message||r.status);window.EE=E;window.TT=rt.ok?await rt.json():[];
