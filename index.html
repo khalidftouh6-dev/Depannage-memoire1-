@@ -25,7 +25,7 @@ ar:{home:"الرئيسية",res:"الحجوزات",emp:"الموظفون",rep:"�
  local:"محفوظ محليًا",types:["تسرب","انقطاع الماء","عداد","أخرى","غير محدد"]}};
 let L='fr',V='home',D=null,db;const t=k=>TR[L][k]||k,$=s=>document.getElementById(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const open=(n='dm')=>new Promise(r=>{const q=indexedDB.open(n,2);q.onupgradeneeded=()=>{['claims','meters','events','res'].forEach(s=>{if(!q.result.objectStoreNames.contains(s))q.result.createObjectStore(s,{keyPath:'id'})})};q.onsuccess=()=>r(q.result)});
+const open=(n='dm')=>new Promise(r=>{const q=indexedDB.open(n,3);q.onupgradeneeded=()=>{['claims','meters','events','res','rp'].forEach(s=>{if(!q.result.objectStoreNames.contains(s))q.result.createObjectStore(s,{keyPath:'id'})})};q.onsuccess=()=>r(q.result)});
 const all=s=>new Promise(r=>{const q=db.transaction(s).objectStore(s).getAll();q.onsuccess=()=>r(q.result)});
 const put=(s,o,raw)=>new Promise(r=>{if(window.TB&&TB[s]&&!raw)o.sync='pending';const q=db.transaction(s,'readwrite').objectStore(s).put(o);q.onsuccess=()=>{r();if(window.TB&&TB[s]&&!raw)setTimeout(()=>sync(),400)}});
 const uid=()=>crypto.randomUUID();
@@ -37,13 +37,13 @@ async function draw(){document.dir=L=='ar'?'rtl':'ltr';
  $('nv').innerHTML=[['home','home'],['claims','claims'],['meters','meters'],['res','res'],['rep','rep'],...(S&&S.profile&&S.profile.role=='admin'?[['emp','emp']]:[])].map(([v,k])=>`<button onclick="V='${v}';D=null;draw()">${t(k)}</button>`).join('');
  const C=await all('claims'),M=await all('meters');const m=$('m');
  if(V=='home'){m.innerHTML=`<div class="g">${['nouvelle','affectee','en_cours','traitee','transferee'].map(s=>`<div class="c" onclick="V='claims';F='${s}';draw()"><div class="n">${C.filter(c=>c.status==s&&!c.cancelled).length}</div>${t(s)}</div>`).join('')}</div>
- <button class="s" onclick="V='new';draw()">+ ${t('neu')}</button><button onclick="seed()">${t('demo')}</button><button onclick="sync(true)">Synchroniser maintenant</button><p id="sy" style="font-size:14px"></p>
+ <button class="s" onclick="V='new';draw()">+ ${t('neu')}</button>${isAdm()?`<button onclick="seed()">${t('demo')}</button>`:''}<button onclick="sync(true)">Synchroniser maintenant</button><button onclick="pw()">Changer mon mot de passe</button>${isAdm()?`<button onclick="backup()">Sauvegarde (télécharger)</button>`:''}<p id="sy" style="font-size:14px"></p>
  <p style="font-size:14px">Une donnée est « Synchronisée » seulement après confirmation du serveur. Hors connexion : enregistrée localement, envoyée plus tard. Annulées exclues des chiffres.</p>`}
  if(V=='claims'){const l=C.filter(c=>!window.F||c.status==F).sort((a,b)=>b.created.localeCompare(a.created));window.F=null;
   m.innerHTML=`<button class="s" onclick="V='new';draw()">+ ${t('neu')}</button>`+(l.map(c=>`<div class="c" onclick="D='${c.id}';V='det';draw()"><b>${esc(c.contract)}</b> · ${esc(c.type)}<br>${bd(c)}<br><small>${new Date(c.created).toLocaleString()}${c.team?' · '+esc(c.team):''}</small></div>`).join('')||t('empty'))}
  if(V=='new')form();
  if(V=='det'){const c=C.find(x=>x.id==D),n=C.filter(x=>key(x.contract)==key(c.contract)).length-1;
-  m.innerHTML=`<div class="c"><h2>${esc(c.contract)}</h2>${bd(c)}<p>${esc(c.type)}</p>${det(c)}<p>${n} ${t('hist')}</p>`+acts(c)+`</div>`}
+  m.innerHTML=`<div class="c"><h2>${esc(c.contract)}</h2>${bd(c)}<p>${esc(c.type)}</p>${det(c)}<p>${n} ${t('hist')}</p>`+acts(c)+`</div><div id="rf"></div>`;refInto($('rf'),c.contract)}
  if(V=='meters')meterView(M);if(V=='res')resView();if(V=='rep')repView();if(V=='emp')empView()}
 function acts(c){if(c.cancelled)return'';const s=c.status;let h='';
  if(s=='nouvelle')h+=`<select id="tm">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><button onclick="up('${c.id}','affectee',{team:$('tm').value})">${t('assign')}</button>`;
@@ -63,10 +63,10 @@ function form(step){const m=$('m');
 function rec(){const c=norm($('fc').value);if(!c)return alert('Le numéro de contrat est obligatoire.');P={contract:c,type:$('ft').value,prio:$('fp').value,notes:$('fn').value};form()}
 async function saveC(){const c={id:uid(),...P,status:'nouvelle',created:new Date().toISOString(),createdBy:S.user.id,sync:'local'};await put('claims',c);await ev(c.id,'création',null,c.contract);P=null;V='claims';draw()}
 function meterView(M){const m=$('m');
- m.innerHTML=`<input id="q" placeholder="${t('search')}" oninput="sm()"><div id="r"></div>`;window.MM=M;sm()}
+ m.innerHTML=`<input id="q" placeholder="${t('search')}" oninput="sm()"><div id="r"></div><div id="rq"></div>`;window.MM=M;sm()}
 function sm(){const q=key($('q').value||'').toLowerCase();$('r').innerHTML=window.MM.filter(x=>!q||key(x.contract).toLowerCase().includes(q)||(x.meterNo||'').toLowerCase().includes(q)).map(x=>
  `<div class="c"><b>${esc(x.contract)}</b> ${x.demo?'<span class="b demo">DÉMO</span>':''}<br>${x.lat!=null?`${x.lat.toFixed(5)}, ${x.lon.toFixed(5)} — ±${x.acc??'?'} m (${x.mode})<br><a href="https://www.google.com/maps/dir/?api=1&destination=${x.lat},${x.lon}">Itinéraire</a>`:'—'}<br><small>${syncL(x)}</small>
- <button onclick="gps('${x.id}')">${t('savegps')}</button></div>`).join('')+`<button class="s" onclick="addM()">+ Compteur</button>`}
+ <button onclick="gps('${x.id}')">${t('savegps')}</button></div>`).join('')+`<button class="s" onclick="addM()">+ Compteur</button>`;refInto($('rq'),$('q').value)}
 async function addM(){const c=norm(prompt('N° de contrat ?')||'');if(!c)return;await put('meters',{id:uid(),contract:c,meterNo:prompt('N° compteur (facultatif)')||'',lat:null,lon:null,hist:[]});draw()}
 function gps(id){if(!navigator.geolocation)return alert('GPS indisponible.');navigator.geolocation.getCurrentPosition(async p=>{const a=Math.round(p.coords.accuracy);
  if(!confirm(`Position mesurée : ${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)} (±${a} m). Enregistrer ?`))return;
@@ -93,6 +93,7 @@ async function sync(manual){if(syncing||!S||!db)return;syncing=true;let ok=0,bad
    await put(s,x,true)}catch(e){bad++;msg='réseau indisponible'}}}
   for(const s in TB){const r=await api('/rest/v1/'+TB[s]+'?select=*&limit=1000');if(!r.ok)continue;const loc=await all(s);const pend=new Set(loc.filter(x=>x.sync!='synced'&&!x.demo).map(x=>x.id));
    for(const row of await r.json()){if(pend.has(row.id))continue;const old=loc.find(x=>x.id==row.id);await put(s,{...(old||{}),...LOC[s](row),sync:'synced',remote:true},true)}}
+ try{const rr=await api('/rest/v1/reperes?select=id,ref,lat,lon,label&limit=1000');if(rr.ok){const L=await rr.json();if(L.length!=(await all('rp')).length)for(const q of L)await put('rp',q,true)}}catch(e){}
  }catch(e){msg=e.message}
  syncing=false;if(S&&['home','claims','meters','res','rep'].includes(V)&&!(document.activeElement&&document.activeElement.matches('input,textarea,select')))await draw();
  const el=$('sy');if(el)el.textContent=(bad?'⚠ '+bad+' échec(s) : '+msg+'. ':'')+(ok?ok+' envoyé(s). ':'')+(manual&&!bad&&!msg?'Synchronisé ✓':'')}
@@ -108,6 +109,20 @@ async function corr(id){const c=(await all('claims')).find(y=>y.id==id);$('m').i
 async function corrSave(id){const c=(await all('claims')).find(y=>y.id==id),w=$('cw').value.trim(),nc=norm($('cc').value);if(!nc)return alert('Le numéro de contrat est obligatoire.');if(!w)return alert('Le motif de la correction est obligatoire.');
  const o={contract:c.contract,type:c.type,prio:c.prio,notes:c.notes},n={contract:nc,type:$('ct').value,prio:$('cp').value,notes:$('cn').value};
  (c.history=c.history||[]).push({at:new Date().toISOString(),by:S.user.id,old:o,new:n,why:w});Object.assign(c,n);await put('claims',c);await ev(id,'correction',o,n,w);V='det';D=id;draw()}
+const isAdm=()=>!!(S&&S.profile&&S.profile.role=='admin');
+async function pw(){const p=prompt('Nouveau mot de passe (8 caractères min.) :');if(!p)return;if(p.length<8)return alert('8 caractères minimum.');if(p!==prompt('Confirmez le mot de passe :'))return alert('Les deux mots de passe sont différents.');const r=await api('/auth/v1/user',{method:'PUT',body:JSON.stringify({password:p})});const j=await r.json().catch(()=>({}));alert(r.ok?'Mot de passe modifié.':'Échec : '+(j.msg||j.message||r.status))}
+async function backup(){if(!isAdm())return;const o={date:new Date().toISOString(),note:'Maximum 1000 lignes par table'};for(const t of ['claims','meters','reservations','teams','profiles','audit_log']){const r=await api('/rest/v1/'+t+'?select=*&limit=1000');o[t]=r.ok?await r.json():'erreur '+r.status}
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o,null,1)],{type:'application/json'}));a.download='sauvegarde-depannage-'+o.date.slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove()}
+const nav=(a,b)=>`https://www.google.com/maps/dir/?api=1&destination=${a},${b}`,mapu=(a,b)=>`https://www.google.com/maps/search/?api=1&query=${a},${b}`;
+async function findRef(contract){const R=await all('rp');const g=norm(contract).split('.').filter(Boolean);let best=[],bl=0;
+ for(const r of R){const rg=String(r.ref).split('.').filter(Boolean);if(!rg.length||rg.length>g.length)continue;if(rg.every((x,i)=>x.toLowerCase()==g[i].toLowerCase())){if(rg.length>bl){bl=rg.length;best=[r]}else if(rg.length==bl)best.push(r)}}
+ return{pts:best,exact:bl>0&&bl==g.length}}
+async function refInto(el,contract){if(!el)return;el.innerHTML='';if(!norm(contract||''))return;const out=[];
+ (await all('meters')).filter(m=>key(m.contract)==key(contract)&&m.lat!=null).forEach(m=>out.push(`<div class="c"><b>Position du compteur (GPS mesuré, ±${m.acc??'?'} m)</b><br><a href="${nav(m.lat,m.lon)}">Itinéraire</a> · <a href="${mapu(m.lat,m.lon)}">Carte</a></div>`));
+ const f=await findRef(contract);
+ if(f.pts.length)out.push(`<div class="c"><b>${f.exact?'Repère trouvé pour ce numéro':'Repère de la zone « '+esc(f.pts[0].ref)+' » (numéro exact absent de la carte)'}</b> — <i>position approximative</i>${f.pts.map((p,i)=>`<br>${f.pts.length>1?'Point '+(i+1)+' : ':''}${esc(p.label||'')} <a href="${nav(p.lat,p.lon)}">Itinéraire</a> · <a href="${mapu(p.lat,p.lon)}">Carte</a>`).join('')}</div>`);
+ else if(!out.length)out.push('<div class="c"><small>Aucun repère trouvé pour ce numéro.</small></div>');
+ el.innerHTML=out.join('')}
 const fn=b=>api('/functions/v1/dynamic-task',{method:'POST',body:JSON.stringify(b)});
 async function empReset(id){const p=prompt('Nouveau mot de passe provisoire (8 caractères min.) :');if(!p)return;if(p.length<8)return alert('8 caractères minimum.');const r=await fn({action:'reset_password',id,password:p});const j=await r.json().catch(()=>({}));alert(r.ok?"Mot de passe réinitialisé. Communiquez-le à l'employé.":'Échec : '+(j.error||r.status))}
 async function empView(){const m=$('m');m.textContent='…';try{const [r,rt]=await Promise.all([api('/rest/v1/profiles?select=*&order=last_name'),api('/rest/v1/teams?select=id,name&order=name')]);const E=await r.json();if(!r.ok)throw new Error(E.message||r.status);window.EE=E;window.TT=rt.ok?await rt.json():[];
