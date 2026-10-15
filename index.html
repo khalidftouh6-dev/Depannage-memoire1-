@@ -26,7 +26,10 @@ ar:{home:"الرئيسية",res:"الحجوزات",emp:"الموظفون",rep:"�
 let L='fr',V='home',D=null,db;const t=k=>TR[L][k]||k,$=s=>document.getElementById(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const open=(n='dm')=>new Promise(r=>{const q=indexedDB.open(n,3);q.onupgradeneeded=()=>{['claims','meters','events','res','rp'].forEach(s=>{if(!q.result.objectStoreNames.contains(s))q.result.createObjectStore(s,{keyPath:'id'})})};q.onsuccess=()=>r(q.result)});
-const all=s=>new Promise(r=>{const q=db.transaction(s).objectStore(s).getAll();q.onsuccess=()=>r(q.result)});
+const allRaw=s=>new Promise(r=>{const q=db.transaction(s).objectStore(s).getAll();q.onsuccess=()=>r(q.result)});
+const visC=c=>{if(!S||!S.profile)return true;const r=S.profile.role;if(r=='admin'||r=='reception')return true;const me=S.user.id;return !c.createdBy||c.createdBy==me||c.assignedTo==me||(!!S.profile.team_id&&tid(c.team)==S.profile.team_id)};
+const all=async s=>{const a=await allRaw(s);return s=='claims'?a.filter(visC):a};
+const del=(s,id)=>new Promise(r=>{const q=db.transaction(s,'readwrite').objectStore(s).delete(id);q.onsuccess=()=>r()});
 const put=(s,o,raw)=>new Promise(r=>{if(TB[s]&&!raw)o.sync='pending';const q=db.transaction(s,'readwrite').objectStore(s).put(o);q.onsuccess=()=>{r();if(TB[s]&&!raw)setTimeout(()=>sync(),400)}});
 const uid=()=>crypto.randomUUID();
 // normalisation : retire seulement espaces/séparateurs usuels, n'altère ni n'ajoute aucun caractère
@@ -83,10 +86,10 @@ const TB={claims:'claims',meters:'meters',res:'reservations'};
 const tid=n=>((window.TT||[]).find(x=>x.name==n)||{}).id||null,tnm=i=>((window.TT||[]).find(x=>x.id==i)||{}).name||'';
 const ROW={claims:c=>({id:c.id,contract:c.contract,type:c.type,priority:c.prio,status:c.status,team_id:tid(c.team),notes:c.notes||null,received_at:c.receivedAt||(c.received?c.created:null),cancelled:!!c.cancelled,cancel_reason:c.cancelWhy||null,transfer_to:c.dest||null,transfer_reason:c.why||null,transferred_at:c.transferAt||null,demo:false,details:{assignedAt:c.assignedAt||null,startedAt:c.startedAt||null,doneAt:c.doneAt||null,method:c.method||null,materials:c.materials||null,result:c.result||null,cancelledAt:c.cancelledAt||null,cancelledBy:c.cancelledBy||null,history:c.history||[],sub:c.sub||null,submitted:!!c.submitted,agentNote:c.agentNote||null,returnNote:c.returnNote||null,returnedAt:c.returnedAt||null,agentAt:c.agentAt||null},assigned_to:c.assignedTo||null,created_by:c.createdBy||S.user.id,created_at:c.created}),
  meters:m=>({id:m.id,contract:m.contract,meter_no:m.meterNo||null,lat:m.lat,lon:m.lon,accuracy_m:m.acc??null,source:m.lat==null?null:(m.mode=='GPS mesuré'?'gps':'manuel'),author:S.user.id}),
- res:x=>({id:x.id,item:x.item,qty:x.qty,team_id:tid(x.team),day:x.day,reason:x.why||null,contract:x.contract||null,author:S.user.id})};
+ res:x=>({id:x.id,item:x.item,qty:x.qty,team_id:tid(x.team),day:x.day,reason:x.why||null,contract:x.contract||null,lead_name:x.lead||null,lead_matricule:x.leadMat||null,author:S.user.id})};
 const LOC={claims:r=>({id:r.id,contract:r.contract,type:r.type,prio:r.priority,status:r.status,team:tnm(r.team_id),notes:r.notes,received:!!r.received_at,receivedAt:r.received_at,cancelled:r.cancelled,cancelWhy:r.cancel_reason,dest:r.transfer_to,why:r.transfer_reason,transferAt:r.transferred_at,...(r.details||{}),createdBy:r.created_by,assignedTo:r.assigned_to,created:r.created_at}),
  meters:r=>({id:r.id,contract:r.contract,meterNo:r.meter_no||'',lat:r.lat,lon:r.lon,acc:r.accuracy_m,mode:r.source=='gps'?'GPS mesuré':(r.source?'Choisi manuellement':undefined)}),
- res:r=>({id:r.id,item:r.item,qty:r.qty,team:tnm(r.team_id),day:r.day,why:r.reason,contract:r.contract})};
+ res:r=>({id:r.id,item:r.item,qty:r.qty,team:tnm(r.team_id),day:r.day,why:r.reason,contract:r.contract,lead:r.lead_name,leadMat:r.lead_matricule})};
 const syncL=x=>x.demo?'Démo (local)':x.sync=='synced'?'Synchronisé':x.sync=='failed'?'Échec de synchronisation':'En attente de synchronisation';
 const syncB=x=>` <span class="b" style="background:var(--line)">${syncL(x)}</span>`;
 let syncing=false;
@@ -97,8 +100,8 @@ async function sync(manual){if(!S||!db)return;if(syncing){again=true;return}sync
    let r=await send(!!x.remote);if(!r.ok&&r.status==409&&!x.remote)r=await send(true);const j=await r.json().catch(()=>null);
    if(r.ok&&Array.isArray(j)&&j.length){x.sync='synced';x.remote=true;ok++}else{x.sync='failed';bad++;msg=r.ok?'refusé par le serveur (droits insuffisants)':((j&&(j.message||j.hint||j.details))||r.status);SE.push(TB[s]+' · '+(x.contract||x.item||x.id)+' · '+(x.remote?'PATCH':'POST')+' HTTP '+r.status+' · '+msg)}
    await put(s,x,true)}catch(e){bad++;msg='erreur : '+e.message;SE.push(TB[s]+' · '+(x.contract||x.item||x.id)+' · '+msg)}}}
-  for(const s in TB){const r=await api('/rest/v1/'+TB[s]+'?select=*&limit=1000');if(!r.ok)continue;const loc=await all(s);const pend=new Set(loc.filter(x=>x.sync!='synced'&&!x.demo).map(x=>x.id));
-   for(const row of await r.json()){if(pend.has(row.id))continue;const old=loc.find(x=>x.id==row.id);const nw={...(old||{}),...LOC[s](row),sync:'synced',remote:true};if(!old||JSON.stringify(old)!=JSON.stringify(nw)){chg++;await put(s,nw,true)}}}
+  for(const s in TB){const r=await api('/rest/v1/'+TB[s]+'?select=*&limit=1000');if(!r.ok)continue;const L0=await r.json();const ids=new Set(L0.map(x=>x.id));const loc=await allRaw(s);if(L0.length<1000)for(const x of loc)if(x.remote&&x.sync=='synced'&&!ids.has(x.id)){await del(s,x.id);chg++}const pend=new Set(loc.filter(x=>x.sync!='synced'&&!x.demo).map(x=>x.id));
+   for(const row of L0){if(pend.has(row.id))continue;const old=loc.find(x=>x.id==row.id);const nw={...(old||{}),...LOC[s](row),sync:'synced',remote:true};if(!old||JSON.stringify(old)!=JSON.stringify(nw)){chg++;await put(s,nw,true)}}}
  try{const rr=await api('/rest/v1/reperes?select=id,ref,lat,lon,label&limit=1000');if(rr.ok){const L=await rr.json();if(L.length!=(await all('rp')).length)for(const q of L)await put('rp',q,true)}}catch(e){}
  }catch(e){msg=e.message}
  syncing=false;if(again){again=false;setTimeout(()=>sync(),300)}
@@ -166,11 +169,13 @@ async function empSave(id){const v=k=>$(k).value.trim();const b={last_name:v('el
  if(!r.ok){const j=await r.json().catch(()=>({}));return $('ex').textContent='Refusé par le serveur : '+(j.error||j.message||r.status)}
  empView()}catch(e){$('ex').textContent=e.message}}
 const dk=d=>new Date(d).toLocaleDateString('sv'),td=()=>dk(Date.now());
+const leadInfo=n=>{const t=(window.TT||[]).find(x=>x.name==n);const L=(window.LD||[]).filter(x=>t&&x.team_id==t.id);return{name:L.map(x=>((x.first_name||'')+' '+(x.last_name||'')).trim()).join(' / '),mat:L.map(x=>x.matricule||'—').join(' / ')}};
+function rlShow(){const e=$('rl');if(!e)return;const L=leadInfo($('rt').value);e.textContent=L.name?"Chef d'équipe : "+L.name+' — Matricule : '+L.mat:"Aucun chef d'équipe défini pour cette équipe"}
 async function resView(){const R=(await all('res')).sort((a,b)=>b.day.localeCompare(a.day));
- $('m').innerHTML=`<div class="c"><input id="ri" placeholder="Matériel demandé"><input id="rc" placeholder="N° de contrat (lieu où la pièce est posée)"><input id="rq" type="number" min="1" placeholder="Quantité"><select id="rt">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><input id="rd" type="date" value="${td()}"><input id="rr" placeholder="Motif"><button class="s" onclick="saveR()">Enregistrer la demande</button></div>`+
- (R.map(x=>`<div class="c"><b>${esc(x.item)}</b> × ${x.qty}<br>${x.contract?'Contrat <b>'+esc(x.contract)+'</b> · ':''}${esc(x.team)} · ${x.day}<br><small>${esc(x.why)}</small></div>`).join('')||t('empty'))}
+ $('m').innerHTML=`<div class="c"><input id="ri" placeholder="Matériel demandé"><input id="rc" placeholder="N° de contrat (lieu où la pièce est posée)"><input id="rq" type="number" min="1" placeholder="Quantité"><select id="rt" onchange="rlShow()">${[1,2,3,4,5,6,7,8].map(i=>`<option>Équipe ${i}</option>`).join('')}</select><div id="rl" style="font-size:14px;margin:4px 0"></div><input id="rd" type="date" value="${td()}"><input id="rr" placeholder="Motif"><button class="s" onclick="saveR()">Enregistrer la demande</button></div>`+
+ (R.map(x=>`<div class="c"><b>${esc(x.item)}</b> × ${x.qty}<br>${x.contract?'Contrat <b>'+esc(x.contract)+'</b> · ':''}${esc(x.team)} · ${x.day}${x.lead?'<br>Chef d\'équipe : <b>'+esc(x.lead)+'</b> — Matricule : '+esc(x.leadMat||'—'):''}<br><small>${esc(x.why)}</small></div>`).join('')||t('empty'));rlShow()}
 async function saveR(){const q=+$('rq').value,i=$('ri').value.trim();if(!i||!(q>0))return alert('Matériel et quantité (≥ 1) obligatoires.');
- await put('res',{id:uid(),item:i,contract:norm($('rc').value),qty:q,team:$('rt').value,day:$('rd').value||td(),why:$('rr').value,created:new Date().toISOString()});resView()}
+ await put('res',{id:uid(),item:i,contract:norm($('rc').value),qty:q,team:$('rt').value,lead:leadInfo($('rt').value).name,leadMat:leadInfo($('rt').value).mat,day:$('rd').value||td(),why:$('rr').value,created:new Date().toISOString()});resView()}
 const cnt=(a,f)=>{const o={};a.forEach(x=>{const k=f(x)||'—';o[k]=(o[k]||0)+1});return Object.entries(o).map(([k,v])=>`<div>${esc(k)} : <b>${v}</b></div>`).join('')||'—'};
 let RD=null,RALL=false;
 async function repView(){const C=await all('claims'),R=await all('res'),T=RD||td(),A=C.filter(c=>!c.cancelled),X=C.filter(c=>c.cancelled),O=A.filter(c=>c.status!='traitee');
@@ -184,7 +189,7 @@ async function repView(){const C=await all('claims'),R=await all('res'),T=RD||td
  <div class="c"><b>Par statut</b>${cnt(LST,c=>t(c.status))}</div><div class="c"><b>Par équipe</b>${cnt(LST,c=>teamL(c.team))}</div><div class="c"><b>Par type</b>${cnt(LST,c=>c.type)}</div>
  <div class="c"><b>Transférées</b> : ${LST.filter(c=>c.status=='transferee').length}</div>
  <div class="c"><b>Annulées (séparées, non comptées)</b> : ${X.length}</div>
- <div class="c"><b>Réservations du jour</b>${cnt(R.filter(x=>x.day==T),x=>x.item+' ×'+x.qty+(x.contract?' @'+x.contract:''))}</div>
+ <div class="c"><b>Réservations du jour</b>${cnt(R.filter(x=>x.day==T),x=>x.item+' ×'+x.qty+(x.contract?' @'+x.contract:'')+(x.lead?' — chef : '+x.lead+' ('+(x.leadMat||'—')+')':''))}</div>
  <h3>Détail des réclamations (${LST.length})</h3>${LST.map(card).join('')||t('empty')}<h3>Réclamations annulées (${X.length})</h3>${X.map(card).join('')||'—'}<button onclick="window.print()">Exporter en PDF (Imprimer → Enregistrer en PDF)</button>`}
 const SB='https://uzvebghzshrygtrdwxsv.supabase.co',KEY='sb_publishable_Bf0QdSJ7CZ1Q1P-LLMJn9A_0dodgZkj';
 let S=null,idle;const ST={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
@@ -193,7 +198,7 @@ function loginUI(msg=''){document.dir=L=='ar'?'rtl':'ltr';$('nv').innerHTML='';$
 async function login(){const lk=+ST.get('lock')||0;if(Date.now()<lk)return $('lm').textContent='Trop d\'échecs. Réessayez dans '+Math.ceil((lk-Date.now())/6e4)+' min.';
  try{const r=await api('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email:$('le').value.trim(),password:$('lp').value})});const j=await r.json();
  if(!r.ok){const n=(+ST.get('fails')||0)+1;ST.set('fails',n);if(n>=5){ST.set('lock',Date.now()+3e5);ST.set('fails',0)}return $('lm').textContent='Identifiants incorrects.'}
- ST.set('fails',0);S=j;const pr=await api('/rest/v1/profiles?id=eq.'+j.user.id+'&select=role,first_name,last_name,active,team_id');const p=(await pr.json())[0];
+ ST.set('fails',0);S=j;const pr=await api('/rest/v1/profiles?id=eq.'+j.user.id+'&select=role,first_name,last_name,active,team_id,matricule');const p=(await pr.json())[0];
  if(!p||!p.active){S=null;return $('lm').textContent='Compte sans profil actif. Contactez l\'administrateur.'}
  S.profile=p;db=await open('dm_'+j.user.id);try{const tr=await api('/rest/v1/teams?select=id,name');window.TT=tr.ok?await tr.json():[]}catch(e){window.TT=[]}try{const lr=await api('/rest/v1/rpc/team_leads',{method:'POST',body:'{}'});window.LD=lr.ok?await lr.json():[]}catch(e){window.LD=[]}try{const ar=await api('/rest/v1/rpc/team_agents',{method:'POST',body:'{}'});window.AG=ar.ok?await ar.json():[]}catch(e){window.AG=[]}$('who').textContent=(p.first_name||'')+' · '+p.role;V='home';draw();arm();sync()}catch(e){$('lm').textContent='Connexion au serveur impossible : '+e.message}}
 async function out(msg){const tk=S;S=null;clearTimeout(idle);loginUI(typeof msg=='string'?msg:'');try{if(tk)await fetch(SB+'/auth/v1/logout',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+tk.access_token}})}catch(e){}}
