@@ -90,13 +90,13 @@ const LOC={claims:r=>({id:r.id,contract:r.contract,type:r.type,prio:r.priority,s
 const syncL=x=>x.demo?'Démo (local)':x.sync=='synced'?'Synchronisé':x.sync=='failed'?'Échec de synchronisation':'En attente de synchronisation';
 const syncB=x=>` <span class="b" style="background:var(--line)">${syncL(x)}</span>`;
 let syncing=false;
-let again=false;
-async function sync(manual){if(!S||!db)return;if(syncing){again=true;return}syncing=true;let ok=0,bad=0,msg='',chg=0;
+let again=false;const SE=[];
+async function sync(manual){if(!S||!db)return;if(syncing){again=true;return}syncing=true;SE.length=0;let ok=0,bad=0,msg='',chg=0;
  try{for(const s in TB){for(const x of await all(s)){if(x.sync=='synced'||x.demo)continue;
    try{const send=async u=>{const b=ROW[s](x);if(u){delete b.id;delete b.created_by;delete b.created_at;delete b.author}return api('/rest/v1/'+TB[s]+(u?'?id=eq.'+x.id:''),{method:u?'PATCH':'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(b)})};
    let r=await send(!!x.remote);if(!r.ok&&r.status==409&&!x.remote)r=await send(true);const j=await r.json().catch(()=>null);
-   if(r.ok&&Array.isArray(j)&&j.length){x.sync='synced';x.remote=true;ok++}else{x.sync='failed';bad++;msg=r.ok?'refusé par le serveur (droits insuffisants)':(j&&j.message)||r.status}
-   await put(s,x,true)}catch(e){bad++;msg='réseau indisponible'}}}
+   if(r.ok&&Array.isArray(j)&&j.length){x.sync='synced';x.remote=true;ok++}else{x.sync='failed';bad++;msg=r.ok?'refusé par le serveur (droits insuffisants)':((j&&(j.message||j.hint||j.details))||r.status);SE.push(TB[s]+' · '+(x.contract||x.item||x.id)+' · '+(x.remote?'PATCH':'POST')+' HTTP '+r.status+' · '+msg)}
+   await put(s,x,true)}catch(e){bad++;msg='erreur : '+e.message;SE.push(TB[s]+' · '+(x.contract||x.item||x.id)+' · '+msg)}}}
   for(const s in TB){const r=await api('/rest/v1/'+TB[s]+'?select=*&limit=1000');if(!r.ok)continue;const loc=await all(s);const pend=new Set(loc.filter(x=>x.sync!='synced'&&!x.demo).map(x=>x.id));
    for(const row of await r.json()){if(pend.has(row.id))continue;const old=loc.find(x=>x.id==row.id);const nw={...(old||{}),...LOC[s](row),sync:'synced',remote:true};if(!old||JSON.stringify(old)!=JSON.stringify(nw)){chg++;await put(s,nw,true)}}}
  try{const rr=await api('/rest/v1/reperes?select=id,ref,lat,lon,label&limit=1000');if(rr.ok){const L=await rr.json();if(L.length!=(await all('rp')).length)for(const q of L)await put('rp',q,true)}}catch(e){}
@@ -104,7 +104,7 @@ async function sync(manual){if(!S||!db)return;if(syncing){again=true;return}sync
  syncing=false;if(again){again=false;setTimeout(()=>sync(),300)}
  if(S&&['home','claims','meters','res','rep'].includes(V)&&(ok||chg||manual)&&!(V=='res'&&['ri','rq','rc','rr'].some(k=>$(k)&&$(k).value))&&!(document.activeElement&&document.activeElement.matches('input,textarea,select')))await draw();
  try{const P=[];for(const k in TB)(await all(k)).forEach(x=>{if(x.sync!='synced'&&!x.demo)P.push(x)});const ss=$('ss');if(ss)ss.textContent=bad?'⚠ '+bad:P.length?'⏳ '+P.length:'✓ '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}catch(e){}
- const el=$('sy');if(el)el.textContent=(bad?'⚠ '+bad+' échec(s) : '+msg+'. ':'')+(ok?ok+' envoyé(s). ':'')+(manual&&!bad&&!msg?'Synchronisé ✓':'')}
+ const el=$('sy');if(el){el.style.whiteSpace='pre-wrap';el.style.userSelect='text'}if(el)el.textContent=(bad?'⚠ '+bad+' échec(s) : '+msg+'. ':'')+(ok?ok+' envoyé(s). ':'')+(manual&&!bad&&!msg?'Synchronisé ✓':'')+(SE.length?'\n'+SE.slice(0,5).join('\n'):'')}
 addEventListener('online',()=>sync());setInterval(()=>{if(S&&!document.hidden)sync()},30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S)sync()});
 const teamL=n=>{if(!n)return n;const t=(window.TT||[]).find(x=>x.name==n);const l=(window.LD||[]).filter(x=>t&&x.team_id==t.id).map(x=>((x.first_name||'')+' '+(x.last_name||'')).trim()).join(' / ');return l?n+' — '+l:n};const fd=d=>d?new Date(d).toLocaleString('fr-FR'):'';
 const det=c=>[['Équipe',c.team?teamL(c.team):'non affectée'],['Agent assigné',agName(c.assignedTo)],['Consigne du chef',c.agentNote],['Notes',c.notes],['Créée le',fd(c.created)],['Affectée le',fd(c.assignedAt)],['Réception confirmée le',fd(c.receivedAt)],['Intervention démarrée le',fd(c.startedAt)],['Traitée le',fd(c.doneAt)],
