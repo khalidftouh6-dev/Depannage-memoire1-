@@ -172,13 +172,17 @@ async function resView(){const R=(await all('res')).sort((a,b)=>b.day.localeComp
 async function saveR(){const q=+$('rq').value,i=$('ri').value.trim();if(!i||!(q>0))return alert('Matériel et quantité (≥ 1) obligatoires.');
  await put('res',{id:uid(),item:i,contract:norm($('rc').value),qty:q,team:$('rt').value,day:$('rd').value||td(),why:$('rr').value,created:new Date().toISOString()});resView()}
 const cnt=(a,f)=>{const o={};a.forEach(x=>{const k=f(x)||'—';o[k]=(o[k]||0)+1});return Object.entries(o).map(([k,v])=>`<div>${esc(k)} : <b>${v}</b></div>`).join('')||'—'};
-async function repView(){const C=await all('claims'),R=await all('res'),T=td(),A=C.filter(c=>!c.cancelled),X=C.filter(c=>c.cancelled),O=A.filter(c=>c.status!='traitee');
- const nw=A.filter(c=>dk(c.created)==T);const LST=A.filter(c=>c.status!='traitee'||dk(c.created)==T||(c.doneAt&&dk(c.doneAt)==T)).sort((a,b)=>b.created.localeCompare(a.created));const card=c=>`<div class="c"><b>${esc(c.contract)}</b> · ${esc(c.type)}<br>${bd(c)}<div style="margin-top:6px">${det(c)}</div></div>`;
- $('m').innerHTML=`<h2>Rapport journalier — ${T}</h2><p style="font-size:14px">Fuseau de l'appareil, journée 00:00–23:59. Données locales.</p>
- <div class="g"><div class="c"><div class="n">${nw.length}</div>Nouvelles du jour</div><div class="c"><div class="n">${O.length}</div>Ouvertes (dont ${O.filter(c=>dk(c.created)<T).length} anciennes)</div></div>
- <div class="c"><b>Par statut</b>${cnt(O.concat(A.filter(c=>c.status=='traitee')),c=>t(c.status))}</div>
- <div class="c"><b>Par équipe</b>${cnt(A,c=>teamL(c.team))}</div><div class="c"><b>Par type</b>${cnt(A,c=>c.type)}</div>
- <div class="c"><b>Transférées</b> : ${A.filter(c=>c.status=='transferee').length}</div>
+let RD=null,RALL=false;
+async function repView(){const C=await all('claims'),R=await all('res'),T=RD||td(),A=C.filter(c=>!c.cancelled),X=C.filter(c=>c.cancelled),O=A.filter(c=>c.status!='traitee');
+ const onT=d=>!!d&&dk(d)==T,nw=A.filter(c=>dk(c.created)==T),dn=A.filter(c=>onT(c.doneAt)),old=O.filter(c=>dk(c.created)<T);
+ const LST=(RALL?A:A.filter(c=>c.status!='traitee'||dk(c.created)==T||onT(c.doneAt))).sort((a,b)=>b.created.localeCompare(a.created));
+ const card=c=>`<div class="c"><b>${esc(c.contract)}</b> · ${esc(c.type)}<br>${bd(c)}<div style="margin-top:6px">${det(c)}</div></div>`;
+ $('m').innerHTML=`<h2>Rapport journalier</h2><input type="date" id="rdx" value="${T}" onchange="RD=this.value||null;repView()"><p style="font-size:14px">Journée 00:00–23:59 (fuseau de l'appareil). Données synchronisées selon vos droits d'accès.</p>
+ <div class="g"><div class="c"><div class="n">${nw.length}</div>Nouvelles du jour</div><div class="c"><div class="n">${dn.length}</div>Traitées du jour</div>
+ <div class="c"><div class="n">${O.length}</div>Ouvertes (dont ${old.length} anciennes)</div><div class="c"><div class="n">${A.length-O.length}</div>Traitées au total</div></div>
+ <button onclick="RALL=!RALL;repView()">${RALL?'Afficher seulement les réclamations de la journée':'Afficher toutes les réclamations (historique)'}</button>
+ <div class="c"><b>Par statut</b>${cnt(LST,c=>t(c.status))}</div><div class="c"><b>Par équipe</b>${cnt(LST,c=>teamL(c.team))}</div><div class="c"><b>Par type</b>${cnt(LST,c=>c.type)}</div>
+ <div class="c"><b>Transférées</b> : ${LST.filter(c=>c.status=='transferee').length}</div>
  <div class="c"><b>Annulées (séparées, non comptées)</b> : ${X.length}</div>
  <div class="c"><b>Réservations du jour</b>${cnt(R.filter(x=>x.day==T),x=>x.item+' ×'+x.qty+(x.contract?' @'+x.contract:''))}</div>
  <h3>Détail des réclamations (${LST.length})</h3>${LST.map(card).join('')||t('empty')}<h3>Réclamations annulées (${X.length})</h3>${X.map(card).join('')||'—'}<button onclick="window.print()">Exporter en PDF (Imprimer → Enregistrer en PDF)</button>`}
