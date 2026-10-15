@@ -4,15 +4,15 @@
 :root{--bg:#f3f7f8;--ink:#10262e;--deep:#0e3a4a;--sun:#f2b632;--card:#fff;--line:#c9d9de}
 @media(prefers-color-scheme:dark){:root{--bg:#0b1d24;--ink:#e6f0f2;--card:#122b35;--line:#2a4852}}
 *{box-sizing:border-box}body{margin:0;font:17px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:70px}
-header{background:var(--deep);color:#fff;padding:12px 16px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;position:sticky;top:0}
-h1{font-size:19px;margin:0}main{padding:14px;max-width:640px;margin:auto}
+header{background:var(--deep);color:#fff;padding:8px 14px;display:flex;flex-wrap:wrap;gap:4px;justify-content:space-between;align-items:center;position:sticky;top:0}
+h1{font-size:17px;margin:0}main{padding:14px;max-width:640px;margin:auto}
 .g{display:grid;grid-template-columns:1fr 1fr;gap:10px}.c{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
 .n{font-size:34px;font-weight:700}button,select,input,textarea{font:inherit;min-height:48px;border-radius:8px;border:1px solid var(--line);padding:8px 12px;width:100%;margin:4px 0;background:var(--card);color:var(--ink)}
 button{background:var(--deep);color:#fff;border:0;font-weight:600}button.s{background:var(--sun);color:#10262e}button.x{background:#9b2c2c}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--deep)}nav button{border-radius:0;margin:0;background:none;font-size:14px}
 .b{display:inline-block;padding:2px 8px;border-radius:6px;font-size:14px;font-weight:600}
 .urgente{background:#c0392b;color:#fff}.normale{background:#f2b632}.faible{background:#2e8b57;color:#fff}.demo{background:#ddd;color:#333}
-@media print{header,nav,button{display:none}body{padding:0}}nav button{font-size:12px;padding:6px}</style></head><body><header><h1>💧 Dépannage Mémoire <small style="font-size:11px;opacity:.7">v1.0</small></h1><span id="ss" style="display:block;width:100%;order:9;text-align:center;font-size:12px;opacity:.9"></span><span id="who" style="font-size:13px"></span><span style="display:flex;gap:6px"><button style="width:auto;min-height:36px" onclick="L=L=='fr'?'ar':'fr';S?draw():loginUI()">FR/عربي</button><button class="x" style="width:auto;min-height:36px" onclick="out()">Sortir</button></span></header>
+@media print{header,nav,button{display:none}body{padding:0}}nav button{font-size:12px;padding:6px}</style></head><body><header><h1>💧 Dépannage Mémoire <small style="font-size:11px;opacity:.7">v1.0</small></h1><span style="display:flex;gap:6px"><button style="width:auto;min-height:32px;margin:0;font-size:13px;padding:2px 10px" onclick="L=L=='fr'?'ar':'fr';S?draw():loginUI()">FR/عربي</button><button class="x" style="width:auto;min-height:32px;margin:0;font-size:13px;padding:2px 10px" onclick="out()">Sortir</button></span><div style="width:100%;display:flex;justify-content:space-between;font-size:12px;opacity:.9"><span id="who"></span><span id="ss"></span></div></header>
 <main id="m"></main><nav id="nv"></nav>
 <script>
 const TR={fr:{home:"Accueil",res:"Réservations",emp:"Employés",rep:"Rapport",claims:"Réclamations",meters:"Compteurs",neu:"Nouvelle réclamation",contract:"N° de contrat",type:"Type",prio:"Priorité",team:"Équipe",notes:"Notes",recap:"Récapitulatif — contrat normalisé :",ok:"Confirmer et enregistrer",back:"Corriger",
@@ -177,10 +177,10 @@ async function repView(){const C=await all('claims'),R=await all('res'),T=RD||td
  const onT=d=>!!d&&dk(d)==T,nw=A.filter(c=>dk(c.created)==T),dn=A.filter(c=>onT(c.doneAt)),old=O.filter(c=>dk(c.created)<T);
  const LST=(RALL?A:A.filter(c=>c.status!='traitee'||dk(c.created)==T||onT(c.doneAt))).sort((a,b)=>b.created.localeCompare(a.created));
  const card=c=>`<div class="c"><b>${esc(c.contract)}</b> · ${esc(c.type)}<br>${bd(c)}<div style="margin-top:6px">${det(c)}</div></div>`;
- $('m').innerHTML=`<h2>Rapport journalier</h2><input type="date" id="rdx" value="${T}" onchange="RD=this.value||null;repView()"><p style="font-size:14px">Journée 00:00–23:59 (fuseau de l'appareil). Données synchronisées selon vos droits d'accès.</p>
+ $('m').innerHTML=`<h2>Rapport journalier</h2><input type="date" id="rdx" value="${T}" onchange="RD=this.value||null;repView()"><p style="font-size:14px"><b>Mode : ${RALL?'Historique (toutes les réclamations)':'Journée du '+T}</b><br>Journée 00:00–23:59 (fuseau de l'appareil). Données synchronisées selon vos droits d'accès.</p>
  <div class="g"><div class="c"><div class="n">${nw.length}</div>Nouvelles du jour</div><div class="c"><div class="n">${dn.length}</div>Traitées du jour</div>
  <div class="c"><div class="n">${O.length}</div>Ouvertes (dont ${old.length} anciennes)</div><div class="c"><div class="n">${A.length-O.length}</div>Traitées au total</div></div>
- <button onclick="RALL=!RALL;repView()">${RALL?'Afficher seulement les réclamations de la journée':'Afficher toutes les réclamations (historique)'}</button>
+ <button onclick="RALL=!RALL;repView()">${RALL?'Revenir à la journée choisie':"Passer à l'historique (toutes les réclamations)"}</button>
  <div class="c"><b>Par statut</b>${cnt(LST,c=>t(c.status))}</div><div class="c"><b>Par équipe</b>${cnt(LST,c=>teamL(c.team))}</div><div class="c"><b>Par type</b>${cnt(LST,c=>c.type)}</div>
  <div class="c"><b>Transférées</b> : ${LST.filter(c=>c.status=='transferee').length}</div>
  <div class="c"><b>Annulées (séparées, non comptées)</b> : ${X.length}</div>
